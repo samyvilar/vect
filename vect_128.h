@@ -60,6 +60,15 @@
 
 #if defined (__SSE2__)
 
+#ifdef __SSSE3__
+    #include <tmmintrin.h>
+#endif
+
+
+#ifdef __SSE_4_1__
+    #include <smmintrin.h>
+#endif
+
 
 #undef vect_128_flt32bit_supprt
 #undef vect_128_flt64bit_supprt
@@ -139,7 +148,7 @@ MAP(vect_128_typedef, scalrs_names)
 // store on aligned addrs
 #define vect_128_store_align_flt32bit(_p, _nv) 	_mm_store_ps((float *)(_p), _nv)
 #define vect_128_store_align_flt64bit(_p, _nv)	_mm_store_pd((double *)(_p), _nv)
-#define vect_128_store_align_intgl(_p, _nv) 		_mm_store_si128((__m128i *)(_p), _nv)
+#define vect_128_store_align_intgl(_p, _nv)     _mm_store_si128((__m128i *)(_p), _nv)
 #define vect_128_store_align_sint64             vect_128_store_align_intgl
 #define vect_128_store_align_sint32             vect_128_store_align_intgl
 #define vect_128_store_align_sint16             vect_128_store_align_intgl
@@ -151,18 +160,37 @@ MAP(vect_128_typedef, scalrs_names)
 #define _vect_128_store_align_(_memb_kind) vect_128_store_align_ ## _memb_kind  macro_cons_parens
 
 
+#define vect_128_cast_to_flt32bit_native(expr) ((vect_128_flt32bit_native_t)(expr))
+//\
+//    comp_select(comp_types_eq(typeof(expr), vect_128_flt64bit_native_t), _mm_castpd_ps,   \
+//    comp_select(comp_types_eq(typeof(expr), vect_128_intgl_native_t),   _mm_castsi128_ps, \
+//    ))(expr)
+
+#define vect_128_cast_to_flt64bit_native(expr) ((vect_128_flt64bit_native_t)(expr))
+//\
+//    comp_select(comp_types_eq(typeof(expr), vect_128_flt32bit_native_t), _mm_castps_pd,   \
+//    comp_select(comp_types_eq(typeof(expr), vect_128_intgl_native_t),   _mm_castsi128_pd, \
+//    (void)0)))
+
+#define vect_128_cast_to_intgl_native(expr) ((vect_128_intgl_native_t)(expr))
+//\
+//    comp_select(comp_types_eq(typeof(expr), vect_128_intgl_native_t), expr,                         \
+//    comp_select(comp_types_eq(typeof(expr), vect_128_flt64bit_native_t), _mm_castpd_si128(expr),    \
+//    comp_select(comp_types_eq(typeof(expr), vect_128_flt32bit_native_t), _mm_castps_si128(expr),    \
+//    (void)0))))
+
 // store on any addrs, (safer but slower than aligned)
-#define vect_128_store_flt32bit(_p, _nv)			_mm_storeu_ps((float *)(_p), _nv)
-#define vect_128_store_flt64bit(_p, _nv)			_mm_storeu_pd((double *)(_p), _nv)
-#define vect_128_store_intgl(_p, _nv)			_mm_storeu_si128((__m128i *)(_p), _nv)
-#define vect_128_store_sint64bit                vect_128_store_intgl
-#define vect_128_store_sint32bit                vect_128_store_intgl
-#define vect_128_store_sint16bit                vect_128_store_intgl
-#define vect_128_store_sint8bit                 vect_128_store_intgl
-#define vect_128_store_uint64bit                vect_128_store_intgl
-#define vect_128_store_uint32bit                vect_128_store_intgl
-#define vect_128_store_uint16bit                vect_128_store_intgl
-#define vect_128_store_uint8bit                 vect_128_store_intgl
+#define vect_128_store_flt32bit(_p, _nv)    _mm_storeu_ps((float *)(_p), vect_128_cast_to_flt32bit_native(_nv))
+#define vect_128_store_flt64bit(_p, _nv)    _mm_storeu_pd((double *)(_p), vect_128_cast_to_flt64bit_native(_nv))
+#define vect_128_store_intgl(_p, _nv)		_mm_storeu_si128((__m128i *)(_p), vect_128_cast_to_intgl_native(_nv))
+#define vect_128_store_sint64bit            vect_128_store_intgl
+#define vect_128_store_sint32bit            vect_128_store_intgl
+#define vect_128_store_sint16bit            vect_128_store_intgl
+#define vect_128_store_sint8bit             vect_128_store_intgl
+#define vect_128_store_uint64bit            vect_128_store_intgl
+#define vect_128_store_uint32bit            vect_128_store_intgl
+#define vect_128_store_uint16bit            vect_128_store_intgl
+#define vect_128_store_uint8bit             vect_128_store_intgl
 #define _vect_128_store_(_memb_kind) vect_128_store_ ## _memb_kind  macro_cons_parens
 
 
@@ -318,9 +346,17 @@ MAP(vect_128_typedef, scalrs_names)
 //
 //  if operands are OK intrisic is applied creating a new vect_t of the same kind as the operands
 //      and returned ....
-#define vect_128_xor_flt32bit           _mm_xor_ps
-#define vect_128_xor_flt64bit           _mm_xor_pd
-#define vect_128_xor_intgl              _mm_xor_si128
+
+
+#define vect_128_bin_cast_to_(a, b, cast_to) \
+    (vect_128_cast_to_ ## cast_to ## _native(a), vect_128_cast_to_ ## cast_to ## _native(b))
+
+#define _vect_128_native_bin_oper(oper, _memb_kind) \
+    vect_128_ ## oper ## _ ## _memb_kind macro_cons_parens
+
+#define vect_128_xor_flt64bit(a, b)     _mm_xor_pd      vect_128_bin_cast_to_(a, b, flt64bit)
+#define vect_128_xor_flt32bit(a, b)     _mm_xor_ps      vect_128_bin_cast_to_(a, b, flt32bit)
+#define vect_128_xor_intgl(a, b)        _mm_xor_si128   vect_128_bin_cast_to_(a, b, intgl)
 #define vect_128_xor_sint64bit          vect_128_xor_intgl
 #define vect_128_xor_sint32bit          vect_128_xor_intgl
 #define vect_128_xor_sint16bit          vect_128_xor_intgl
@@ -329,12 +365,12 @@ MAP(vect_128_typedef, scalrs_names)
 #define vect_128_xor_uint32bit          vect_128_xor_intgl
 #define vect_128_xor_uint16bit          vect_128_xor_intgl
 #define vect_128_xor_uint8bit           vect_128_xor_intgl
-#define _vect_128_xor_(_memb_kind)       vect_128_xor_ ## _memb_kind macro_cons_parens
+#define _vect_128_xor_(_memb_kind)      _vect_128_native_bin_oper(xor, _memb_kind)
 
 
-#define vect_128_or_flt32bit            _mm_or_ps
-#define vect_128_or_flt64bit            _mm_or_pd
-#define vect_128_or_intgl               _mm_or_si128
+#define vect_128_or_flt64bit(a, b)      _mm_or_pd       vect_128_bin_cast_to_(a, b, flt64bit)
+#define vect_128_or_flt32bit(a, b)      _mm_or_ps       vect_128_bin_cast_to_(a, b, flt32bit)
+#define vect_128_or_intgl(a, b)         _mm_or_si128    vect_128_bin_cast_to_(a, b, intgl)
 #define vect_128_or_sint64bit           vect_128_or_intgl
 #define vect_128_or_sint32bit           vect_128_or_intgl
 #define vect_128_or_sint16bit           vect_128_or_intgl
@@ -343,12 +379,12 @@ MAP(vect_128_typedef, scalrs_names)
 #define vect_128_or_uint32bit           vect_128_or_intgl
 #define vect_128_or_uint16bit           vect_128_or_intgl
 #define vect_128_or_uint8bit            vect_128_or_intgl
-#define _vect_128_or_(_memb_kind)        vect_128_or_ ## _memb_kind macro_cons_parens
+#define _vect_128_or_(_memb_kind)       _vect_128_native_bin_oper(or, _memb_kind)
 
 
-#define vect_128_and_flt32bit           _mm_and_ps
-#define vect_128_and_flt64bit           _mm_and_pd
-#define vect_128_and_intgl              _mm_and_si128
+#define vect_128_and_flt64bit(a, b)     _mm_and_pd          vect_128_bin_cast_to_(a, b, flt64bit)
+#define vect_128_and_flt32bit(a, b)     _mm_and_ps          vect_128_bin_cast_to_(a, b, flt32bit)
+#define vect_128_and_intgl(a, b)        _mm_and_si128       vect_128_bin_cast_to_(a, b, intgl)
 #define vect_128_and_sint64bit          vect_128_and_intgl
 #define vect_128_and_sint32bit          vect_128_and_intgl
 #define vect_128_and_sint16bit          vect_128_and_intgl
@@ -357,8 +393,9 @@ MAP(vect_128_typedef, scalrs_names)
 #define vect_128_and_uint32bit          vect_128_and_intgl
 #define vect_128_and_uint16bit          vect_128_and_intgl
 #define vect_128_and_uint8bit           vect_128_and_intgl
-#define _vect_128_and_(_memb_kind)       vect_128_and_ ## _memb_kind macro_cons_parens
+#define _vect_128_and_(_memb_kind)       _vect_128_native_bin_oper(and, _memb_kind)
 
+// TODO: figure out a way to detect scalar type and broadcasted ...
 #define vect_128_broad_cast_if_scalr(_opern, _vect_type)  (_opern)
 //({         \
 //    typeof(_vect_type) _broad_casted_vect;                          \
@@ -368,7 +405,7 @@ MAP(vect_128_typedef, scalrs_names)
 //        _opern                                                      \
 //   ); })
 
-#define vect_128_bitwise_bin_oper(oper, oper_a, oper_b, dest) (         \
+#define vect_128_bin_oper(oper, oper_a, oper_b, dest) (                 \
     vect_set_native(                                                    \
         dest,                                                           \
         macro_apply(                                                    \
@@ -387,97 +424,250 @@ MAP(vect_128_typedef, scalrs_names)
    ), dest)
 
 
+
 #undef vect_128_and
-#define vect_128_and(a, b, out)  vect_128_bitwise_bin_oper(and, a, b, out)
+#define vect_128_and(a, b, out)  vect_128_bin_oper(and, a, b, out)
 #undef vect_128_or
-#define vect_128_or(a, b, out)   vect_128_bitwise_bin_oper(or, a, b, out)
+#define vect_128_or(a, b, out)   vect_128_bin_oper(or, a, b, out)
 #undef vect_128_xor
-#define vect_128_xor(a, b, out)  vect_128_bitwise_bin_oper(xor, a, b, out)
+#define vect_128_xor(a, b, out)  vect_128_bin_oper(xor, a, b, out)
 
 
 
 // add two 128 bit vectors
-#define vect_128_add_flt64bit           _mm_add_pd
-#define vect_128_add_flt32bit           _mm_add_ps
-#define vect_128_add_sint8bit           _mm_add_epi8
-#define vect_128_add_sint16bit          _mm_add_epi16
-#define vect_128_add_sint32bit          _mm_add_epi32
-#define vect_128_add_sint64bit          _mm_add_epi64
+#define vect_128_add_flt64bit(a, b)     _mm_add_pd      vect_128_bin_cast_to_(a, b, flt64bit)
+#define vect_128_add_flt32bit(a, b)     _mm_add_ps      vect_128_bin_cast_to_(a, b, flt32bit)
+#define vect_128_add_sint8bit(a, b)     _mm_add_epi8    vect_128_bin_cast_to_(a, b, intgl)
+#define vect_128_add_sint16bit(a, b)    _mm_add_epi16   vect_128_bin_cast_to_(a, b, intgl)
+#define vect_128_add_sint32bit(a, b)    _mm_add_epi32   vect_128_bin_cast_to_(a, b, intgl)
+#define vect_128_add_sint64bit(a, b)    _mm_add_epi64   vect_128_bin_cast_to_(a, b, intgl)
 #define vect_128_add_uint8bit           vect_128_add_sint8bit
 #define vect_128_add_uint16bit          vect_128_add_sint16bit
 #define vect_128_add_uint32bit          vect_128_add_sint32bit
 #define vect_128_add_uint64bit          vect_128_add_sint64bit
+#define _vect_128_add_(_memb_kind)      _vect_128_native_bin_oper(add, _memb_kind)
+
+#undef vect_128_add
+#define vect_128_add(a, b, out)        vect_128_bin_oper(add, a, b, out)
 
 
 // sub two vectors
-#define vect_128_sub_flt64bit           _mm_sub_pd
-#define vect_128_sub_flt32bit           _mm_sub_ps
-#define vect_128_sub_sint8bit           _mm_sub_epi8
-#define vect_128_sub_sint16bit          _mm_sub_epi16
-#define vect_128_sub_sint32bit          _mm_sub_epi32
-#define vect_128_sub_sint64bit          _mm_sub_epi64
+#define vect_128_sub_flt64bit(a, b)     _mm_sub_pd      vect_128_bin_cast_to_(a, b, flt64bit)
+#define vect_128_sub_flt32bit(a, b)     _mm_sub_ps      vect_128_bin_cast_to_(a, b, flt32bit)
+#define vect_128_sub_sint8bit(a, b)     _mm_sub_epi8    vect_128_bin_cast_to_(a, b, intgl)
+#define vect_128_sub_sint16bit(a, b)    _mm_sub_epi16   vect_128_bin_cast_to_(a, b, intgl)
+#define vect_128_sub_sint32bit(a, b)    _mm_sub_epi32   vect_128_bin_cast_to_(a, b, intgl)
+#define vect_128_sub_sint64bit(a, b)    _mm_sub_epi64   vect_128_bin_cast_to_(a, b, intgl)
 #define vect_128_sub_uint8bit           vect_128_sub_sint8bit
 #define vect_128_sub_uint16bit          vect_128_sub_sint16bit
 #define vect_128_sub_uint32bit          vect_128_sub_sint32bit
 #define vect_128_sub_uint64bit          vect_128_sub_sint64bit
+#define _vect_128_sub_(_memb_kind)      _vect_128_native_bin_oper(sub, _memb_kind)
+
+#undef vect_128_sub
+#define vect_128_sub(a, b, out)     vect_128_bin_oper(sub, a, b, out)
 
 
 
 // mul two vectors
-#define vect_128_mul_flt64bit       _mm_mul_pd
-#define vect_128_mul_flt32bit       _mm_mul_ps
-
-// multiplies the the low and high 32 bits each creating a 64 bit unsigned result ...
-#define vect_128_mul_sint32bit(a, b) ({                                         \
-        vector_t _a_ = (a), _b_ = (b);                                          \
-        _mm_unpacklo_epi32(                                                     \
-            _mm_shuffle_epi32(_mm_mul_epu32(_a_, _b_), _MM_SHUFFLE (0,0,2,0)),  \
-            _mm_shuffle_epi32(                                                  \
-                _mm_mul_epu32(_mm_srli_si128(_a_, 4), _mm_srli_si128(_b_, 4)),  \
-                _MM_SHUFFLE(0,0,2,0)                                            \
-            )                                                                   \
-        );  })
-#define vect_128_mul_uint32bit vect_128_mul_sint32bit
-
-
-#define vect_128_mul_sint16bit      _mm_mullo_epi16
-#define vect_128_mul_uint16bit      vect_128_mul_sint16bit
-
-
+#define vect_128_mul_flt64bit(a, b)     _mm_mul_pd  vect_128_bin_cast_to_(a, b, flt64bit)
+#define vect_128_mul_flt32bit(a, b)     _mm_mul_ps  vect_128_bin_cast_to_(a, b, flt32bit)
 
 /*
-    SSE doesn't support 64 bit multiplication, but it can be emulated assuming a & b vectors with 64 bit numbers
-     assume a, b are 64 bit numbers and high/low return the corresponding 32 bits
+    SSE doesn't support 64 bit multiplication, but it can be emulated
+     assume a, b are 64 bit numbers and high/low are their corresponding bits where low has its upper zerord out
      then a * b
         == (low(a) + high(a)) * (low(b) + high(b))
         == low(a)*low(b) + low(a)*high(b) + high(a)*low(b) + high(a)*high(b)
         == low(a)*low(b) + high(a)*high(b) + (high(a)*low(b) + high(a)*low(b))
         a * high(x) == a * ((x / 2**32) * 2**32) == (a * (x >> 32)) << 32
 
-        vector_t high_a = _mm_shuffle_epi32(a, _MM_SHUFFLE(2, 3, 0, 1)), high_b = _mm_shuffle_epi32(a, _MM_SHUFFLE(2, 3, 0, 1));
-        _mm_mul_epi32(a, b) multiplies the low parts of each 64 bit number.
-        + _mm_mul_epi32(high_a, high_b) multiply high parts
-        + _mm_mul_epi32(a,  high_b)
-        + _mm_mul_epi32(high_a,  b)   // reqs 2 shuffles, 4 mults, 3 adds (9 instrs)
- */
+        high(a) * high(b) == (((a >> 32) * (b >> 32)) << 64) % 2**64 == 0 (so we can remove this one)
 
-#define vect_128_mul_sint64bit(a, b)  ({                                                 \
-        typeof(a)                                                                            \
-            _a = (a),                                                                       \
-            _b = (b),                                                                       \
-            high_a = _mm_shuffle_epi32(_a, _MM_SHUFFLE(2, 3, 0, 1)),                        \
-            high_b = _mm_shuffle_epi32(_b, _MM_SHUFFLE(2, 3, 0, 1));                        \
-        vect_128_add_sint64bit(                                                              \
-            vect_128_add_sint64bit(_mm_mul_epu32(_a, _b),  _mm_mul_epu32(high_a, high_b)),   \
-            vect_128_add_sint64bit(_mm_mul_epu32(_a,  high_b), _mm_mul_epu32(high_a,  _b))   \
-        ); )}
+        high(a)*low(b) + low(a)*high(b)
+        ((a >> 32)*b) << 32 + a*(b >> 32) << 32 == ((a >> 32)*b + (b >> 32)*a) << 32
+
+    _add_64(
+        _add_64(_mul_32(high(a), low(b)), _mul_32(low(a), high(b))) << 32,
+        _mul_32(low(a), low(b))
+    )
+
+        reqs:
+        _mm_shuffle_epi32:  2x(1, 0.5)
+        _mm_mul_epu32:      3x(3, 1)
+        _mm_add_epi64:      2x(1, 0.5)
+        _mm_slli_epi64:     1x(1, 1)
+
+        about 14 cycles ...
+ */
+#define vect_128_mul_sint64bit(a, b)  ({                                                \
+    vect_128_intgl_native_t low_a = vect_128_cast_to_intgl_native(a);                   \
+    vect_128_intgl_native_t low_b = vect_128_cast_to_intgl_native(b);                   \
+    typeof(low_a) high_a = _mm_shuffle_epi32(low_a, _MM_SHUFFLE(2, 3, 0, 1));           \
+    typeof(low_b) high_b = _mm_shuffle_epi32(low_b, _MM_SHUFFLE(2, 3, 0, 1));           \
+        _mm_add_epi64(                          \
+            _mm_mul_epu32(low_a, low_b),        \
+            _mm_slli_epi64(                     \
+                _mm_add_epi64(_mm_mul_epu32(high_a, low_b), _mm_mul_epu32(low_a, high_b)), \
+                32                              \
+            )                                   \
+    ); })
 
 #define vect_128_mul_uint64bit vect_128_mul_sint64bit
+
+#define _mm_mullo_epi32(a, b) ({        \
+    typeof(a) va = (a);                 \
+    typeof(b) vb = (b);                 \
+    _mm_unpacklo_epi32(                 \
+        _mm_shuffle_epi32(              \
+            _mm_mul_epu32(va, vb),      \
+            _MM_SHUFFLE (0,0,2,0)       \
+        ),                              \
+        _mm_shuffle_epi32(              \
+            _mm_mul_epu32(              \
+                _mm_srli_si128(va, 4),  \
+                _mm_srli_si128(_b_, 4)  \
+            ),                          \
+            _MM_SHUFFLE (0,0,2,0)       \
+        )                               \
+    );   })
+
+#ifdef __SSE4_1__
+    #define vect_128_mul_sint32bit _mm_mullo_epi32
+#else
+// multiplies the the low and high 32 bits each creating a 64 bit unsigned result ...
+#define vect_128_mul_sint32bit(a, b) ({                     \
+        vect_128_intgl_native_t va = vect_128_cast_to_intgl_native(a);    \
+        vect_128_intgl_native_t vb = vect_128_cast_to_intgl_native(b);    \
+        _mm_unpacklo_epi32(                     \
+            _mm_shuffle_epi32(                  \
+                _mm_mul_epu32(va, vb),          \
+                _MM_SHUFFLE (0,0,2,0)           \
+            ),                                  \
+            _mm_shuffle_epi32(                  \
+                _mm_mul_epu32(                  \
+                    _mm_srli_si128(va, 4),      \
+                    _mm_srli_si128(vb, 4)       \
+                ),                              \
+                _MM_SHUFFLE(0,0,2,0)            \
+            )                                   \
+        );  })
+#endif
+#define vect_128_mul_uint32bit vect_128_mul_sint32bit
+
+
+#define vect_128_mul_sint16bit(a, b)      _mm_mullo_epi16 vect_128_bin_cast_to_(a, b, intgl)
+#define vect_128_mul_uint16bit      vect_128_mul_sint16bit
+
+
+#ifdef __SSE4_1__
+    #define vect_128_cvt_uint8bit_to_uint16bit      _mm_cvtepu8_epi16
+#else
+    #define vect_128_cvt_uint8bit_to_uint16bit(a)   _mm_unpacklo_epi8(a, _mm_setzero_si128())
+#endif
+
+// SSE doesn't support 8 bit multiplication we need to emulate it using 16 bit multiplication
+//#ifdef __SSSE3__
+/**
+    1) spread out each of the upper 8 bits into 16 bits (zero extended) (and multiply)
+    2) spread out each of the lower 8 bits into 16 bits (zero extended) (and multiply)
+    3) join the solutions by selecting the lower 8 bit results from each 16 bit multiplication
+    - _mm_setzero_si128:        2x(1, 0.33)
+    - _mm_unpackhi_epi8:        2x(1, 0.5)
+    - _mm_mullo_epi16:          2x(3, 1)
+    - _mm_set_epi8:             0
+    - _mm_shuffle_epi8(SSSE):   2x(1, 0.5)
+    - _mm_or_si128:             1x(1, 0.33)
+
+    vect_128_cvt_uint8bit_to_uint16bit:
+        - _mm_cvtepu8_epi16(SSE4.1):             2x(1, 0.5)
+        - _mm_unpacklo_epi8(1, 0.5), _mm_setzero_si128(1, 0.33)   2x(2, 0.5)
+
+
+    about 13 cycles (give or take 1-2 cycles depending on SSE4.1 support) vs manually doing 16 muls (manually)
+*/
+//  requires SSS3 ....
+#define vect_128_mul_ssse3_sint8bit(_a, _b) ({                      \
+    vect_128_intgl_native_t va = vect_128_cast_to_intgl_native(_a); \
+    vect_128_intgl_native_t vb = vect_128_cast_to_intgl_native(_b); \
+    _mm_or_si128(                                                   \
+          _mm_shuffle_epi8(                                         \
+              _mm_mullo_epi16(                                      \
+                  _mm_unpackhi_epi8(va, _mm_setzero_si128()),       \
+                  _mm_unpackhi_epi8(vb, _mm_setzero_si128())        \
+              ),                                                    \
+              _mm_set_epi8(                                         \
+                  14,   12,   10,   8,    6,    4,    2,    0,      \
+                  0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80    \
+              )                                                     \
+          ),                                                        \
+          _mm_shuffle_epi8(                                         \
+              _mm_mullo_epi16(                                      \
+                  vect_128_cvt_uint8bit_to_uint16bit(va),           \
+                  vect_128_cvt_uint8bit_to_uint16bit(vb)            \
+             ),                                                     \
+             _mm_set_epi8(                                          \
+                  0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,   \
+                  14,   12,   10,   8,    6,    4,    2,    0       \
+             )                                                      \
+        )                                                           \
+   ); })
+
+/*
+    1) multiply all the odd indexed 8 bit components
+        (by doing a logical 8 bit right shift on 16 bit words)
+    2) multiply all the even index 8 bit components
+        (zero upper half by applying and mask)
+    3) shift odd indexed reslt to the left by doing an 8 bit left shift on 16 bit words
+    4) apply mask to even indexed results
+    5) or both results together ...
+    - _mm_srli_epi16:   2x(1, 1)
+    - _mm_slli_epi16:   1x(1, 0.5)
+    - _mm_mullo_epi16:  2x(3, 1)
+    - _mm_and_si128:    3x(1, 0.33)
+    - _mm_set_epi8:     ...
+    - _mm_or_si128:     1x(1, 0.33)
+
+    about 13 cycles
+ */
+#define vect_128_mul_sse2_sint8bit(_a, _b) ({           \
+    vect_128_intgl_native_t va = vect_128_cast_to_intgl_native(_a);\
+    vect_128_intgl_native_t vb = vect_128_cast_to_intgl_native(_b);\
+    const typeof(va) even_entrs = _mm_set_epi8(         \
+        0, 0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF,             \
+        0, 0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF              \
+    );                                                  \
+    _mm_or_si128(                                       \
+        _mm_slli_epi16(                                 \
+            _mm_mullo_epi16(                            \
+                _mm_srli_epi16(va, 8),                  \
+                _mm_srli_epi16(vb, 8)                   \
+            ),                                          \
+        8),                                             \
+        _mm_and_si128(                                  \
+            _mm_mullo_epi16(                            \
+                _mm_and_si128(va, even_entrs),          \
+                _mm_and_si128(vb, even_entrs)           \
+            ),                                          \
+            even_entrs                                  \
+        )                                               \
+    ); })
+
+#define vect_128_mul_sint8bit vect_128_mul_sse2_sint8bit // vect_128_mul_ssse3_sint8bit // slightly slower ...
+#define vect_128_mul_uint8bit vect_128_mul_sint8bit
+
+
+#define _vect_128_mul_(_memb_kind) _vect_128_native_bin_oper(mul, _memb_kind)
+
+#undef vect_128_mul
+#define vect_128_mul(a, b, out) vect_128_bin_oper(mul, a, b, out)
 
 
 // div two vectors
 #define vect_128_div_flt64div   _mm_div_pd
 #define vect_128_div_flt32div   _mm_div_ps
+
+/**************************************************************************************************/
 
 
 // etract member from vectors ...
@@ -530,35 +720,9 @@ _m; })
         } _m; })
 #define vect_128_extrt_64_uint(a, _im) ((uint_bit_t(64))vect_128_extrt_64_s_int(a, _im))
 
-// sse2 can only extract the lower 32 bits so we need to either shuffle or shift ...
-
-
-    #define _mm_mullo_epi32(a, b) ({                                            \
-        vector_t _a_ = (a), _b_ = (b);                                          \
-        _mm_unpacklo_epi32(                                                     \
-            _mm_shuffle_epi32(_mm_mul_epu32(_a_, _b_), _MM_SHUFFLE (0,0,2,0)),  \
-            _mm_shuffle_epi32(_mm_mul_epu32(_mm_srli_si128(_a_, 4), _mm_srli_si128(_b_, 4)), _MM_SHUFFLE (0,0,2,0))); })
-
 // sse2 can only extract the lower 64 bit number for the upper we need to either shuffer or shift
 
 
-
-#define vector_mul_i(a, b, i) ({\
-        vector_t _r; \
-        switch (sizeof(i)) {\
-            case 2: _r = _mm_mullo_epi16(a, b); break ;\
-            case 4: _r = _mm_mullo_epi32(a, b); break ; \
-            case 8: {\
-                vector_t _a = (a), _b = (b), \
-                high_a = _mm_shuffle_epi32(_a, _MM_SHUFFLE(2, 3, 0, 1)), \
-                high_b = _mm_shuffle_epi32(_b, _MM_SHUFFLE(2, 3, 0, 1)); \
-                _r = vector_add_i(\
-                    vector_add_i(_mm_mul_epu32(_a, _b),  _mm_mul_epu32(high_a, high_b), i), \
-                    vector_add_i(_mm_mul_epu32(_a,  high_b), _mm_mul_epu32(high_a,  _b), i),\
-                    i);}} _r;})
-
-#define vect_128_shft_left_imm_8_s_int(a, i) vect_128_and(vect_128_broad_cast_8_s_int(0xFF << (i))
-// SSE doesn't support byte shifts so just do word shifts since it will shift bytes anyway and with byte incase their all zero out, since words won't be ...
 
 #define vect_128_lshft_imm_flt32bit(a, _imm) _mm_castsi128_ps(vect_128_lshft_imm_sint32bit(_mm_castps_si128(a), _imm))
 #define vect_128_lshft_imm_flt64bit(a, _imm) _mm_castsi128_pd(vect_128_lshft_imm_sint64bit(_mm_castpd_si128(a), _imm))
@@ -665,11 +829,7 @@ _m; })
 
 #endif
 
-#if defined (__SSE4_1__)
-    #include <smmintrin.h>
-
-    #undef vect_128_mul_sint32bit
-    #define vect_128_mul_sint32bit   _mm_mullo_epi32
+#if defined (__SSE4_1__)    
 
     #undef vect_128_extrt_sint8bit
     #define vect_128_extrt_sint8bit _mm_extract_epi8
@@ -680,11 +840,6 @@ _m; })
     #undef vect_128_extrt_sint64bit
     #define vect_128_extrt_sint64bit  _mm_extract_epi64
 
-    #undef vect_is_zeros
-    #define vect_is_zeros(a) _mm_testz_si128(a, a)
-
-    #undef vect_128_eq
-//    #define vect_128_eq(a, b) _mm_testz_si128(vector_xor(a, b), _mm_set1_epi32(-1))
 #endif
 
 

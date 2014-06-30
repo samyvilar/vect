@@ -2,3 +2,5 @@ syntax: glob
 *.out
 *.o
 *.1
+.DS_Store
+*.autosave

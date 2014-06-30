@@ -52,20 +52,8 @@
 #define cnt_leadn_zrs_8 __builtin_clzb
 #define cnt_leadn_zrs_16 __builtin_clzs
 #define cnt_leadn_zrs_32 __builtin_clz
-#define cnt_leadn_zrs_64 __builtin_clzll
+#define cnt_leadn_zrs_64 __builtin_clzll   
 
-#define singl_param_integral_macro(func_name, param, ret_type) ({       \
-    ret_type _ret_;                                                     \
-    switch (sizeof(param)) {                                            \
-        case 1: _ret_ = func_name ## 8(param);  break ;                 \
-        case 2: _ret_ = func_name ## 16(param); break ;                 \
-        case 4: _ret_ = func_name ## 32(param); break ;                 \
-        case 8: _ret_ = func_name ## 64(param); break ;                 \
-    } _ret_;  })
-
-#define cnt_leadn_zrs(x) singl_param_integral_macro(cnt_leadn_zrs_, x, unsigned)
-
-#define leadn_one_index(x) (bit_size(x) - cnt_leadn_zrs(x))
 
 #define cnt_trlng_zrs_8 __builtin_ctzb
 #define cnt_trlng_zrs_16 __builtin_ctzs
@@ -270,6 +258,51 @@ typedef struct packed_bits_t {  // represents a set of packed bits, used to stor
 
 
 #define bits_intrp_as_dbl(a)  (((union {double _d; typeof(a) _value;}){._value = (a)})._d)
-#define bits_intrp_as_sngl(a) (((union {float _s; typeof(a) _value;}){._value = (a)})._s)
+#define bits_intrp_as_sngl(a) (((union {float _s; typeof(a) _value;}){._value = (a)})._s)   
+
+
+#define cnt_leadn_zrs(x)        \
+    scalr_switch(               \
+        x,                      \
+        cnt_leadn_zrs_64(_interp(x, flt_bit_t(64), sint_bit_t(64))),    \
+        cnt_leadn_zrs_32(_interp(x, flt_bit_t(32), sint_bit_t(32))),    \
+        cnt_leadn_zrs_64(x), cnt_leadn_zrs_32(x), cnt_leadn_zrs_16(x), cnt_leadn_zrs_8(x),     \
+        cnt_leadn_zrs_64(x), cnt_leadn_zrs_32(x), cnt_leadn_zrs_16(x), cnt_leadn_zrs_8(x),     \
+        (void)0 \
+    )
+#define leadn_one_index(x) (bit_size(x) - cnt_leadn_zrs(x))
+
+
+#define rand_entropy_bit_mag leadn_one_index(RAND_MAX) // rands number of bits
+#define rand_enty_cnt(_t) ((bit_size(_t)/rand_entropy_bit_mag) + !!(bit_size(_t) % rand_entropy_bit_mag))
+
+#define bits_rand(_t) ({                                                                \
+    int _rand_bits[rand_enty_cnt(_t)];                                                  \
+    unsigned _index, _set_bit_cnt;                                                      \
+    for (_index = 0; _index < (sizeof(_rand_bits)/sizeof(_rand_bits[0])); _index++) {   \
+        _rand_bits[_index] = 0;                                                         \
+        for (_set_bit_cnt = 0; _set_bit_cnt < bit_size(_rand_bits[0]); _set_bit_cnt += rand_entropy_bit_mag)\
+            _rand_bits[_index] |= rand() << _set_bit_cnt;                               \
+    } scalr_switch(                                                                     \
+        _t,                                                                             \
+        ((*(sint_bit_t(64) *)_rand_bits) / ((double)(-1LLU))),                          \
+        ((*(sint_bit_t(32) *)_rand_bits) / (float)(-1U)),                               \
+        *(sint_bit_t(64) *)_rand_bits,                                                  \
+        *(sint_bit_t(32) *)_rand_bits,                                                  \
+        *(sint_bit_t(16) *)_rand_bits,                                                  \
+        *(sint_bit_t(8) *)_rand_bits,                                                   \
+        *(uint_bit_t(64) *)_rand_bits,                                                  \
+        *(uint_bit_t(32) *)_rand_bits,                                                  \
+        *(uint_bit_t(16) *)_rand_bits,                                                  \
+        *(uint_bit_t(8) *)_rand_bits,                                                   \
+        (void)0                                                                         \
+    ); })
+/* ^^^^^^^^^^^^^^^^^^^^^^^^ returns a random number from a type or expr, if type is flt,
+ *                returns a number from -1 to 1
+ *                for integral types simply sets the appropriate number of bits
+ *                 returns the bits interpreted as _t.
+ */                                                                                     \
+
+
 
 #endif

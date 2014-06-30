@@ -274,8 +274,8 @@ typedef union { // union of all types, allowing us to interpret the bits from on
             uint_bit_t(32),         \
             flt_bit_t(32)           \
         ),                          \
-        macro_comma_delim_8(((uint_bit_t(64))(a) oper (uint_bit_t(64))(b))),        \
-        (void)0                                     \
+        macro_comma_delim_8(((uint_bit_t(64))(a) oper (uint_bit_t(64))(b))),\
+        (void)0                     \
     )
 
 #define scalr_xor(a, b) scalr_bit_oper(a, ^, b)
@@ -286,6 +286,8 @@ typedef union { // union of all types, allowing us to interpret the bits from on
 #define scalr_sub(a, b) ((a) - (b))
 #define scalr_mul(a, b) ((a) * (b))
 #define scalr_div(a, b) ((a) / (b))
+
+#define scalr_oper(_oper) scalr_ ## _oper
 
 // right shift bits, flts are interpreted as the corresponding intgl type, before the right shift,
 // ther result is interpreted back as the same flt type before returned
@@ -426,5 +428,24 @@ typedef union { // union of all types, allowing us to interpret the bits from on
             )                       \
         )                           \
     )
+
+#include <stdio.h>
+#define scalr_str(buffer, _expr) ({             \
+    typeof(buffer[0]) *_temp = (buffer);        \
+    sprintf(                                    \
+        _temp,                                  \
+        scalr_switch(                           \
+            _expr,                              \
+            "%f", "%f", "%lli", "%i", "%hi", "%hhi", "%llu", "%u", "%hu", "%hhu",           \
+            (void)0                             \
+        ),                                      \
+        (typeof(scalr_switch(_expr,             \
+            (double)0, (double)0,               \
+            (signed long long int)0, (int)0, (short)0, (char)0, (unsigned long long int)0,  \
+            (unsigned int)0, (unsigned short)0, (unsigned char)0, \
+            (void)0))       \
+        )(_expr)            \
+    ); _temp; })
+
 
 #endif
