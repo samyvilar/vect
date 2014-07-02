@@ -64,4 +64,9 @@
 #define _test_vect_128_mul(_memb_type)  _test_vect_128_bin_oper(mul, _memb_type)
 
 
+#ifndef _test_type
+    #error please specify the vector component type using -D_test_type=a_type_name
+#endif
+
+
 #endif // TEST_VECT_128_BIN_OPER_H

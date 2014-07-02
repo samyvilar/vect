@@ -15,12 +15,8 @@ int main() {
             );                                                              \
      });
 
-    printf("test_vect_128_store: ");
-    #ifdef enable_test
-        MAP_2(_test_vect_128_store, test_memb_types)
-    #endif
 
-    print_ok();
+    run_test_vect_128(store, _test_vect_128_store, _test_type);
 
     return 0;
 }

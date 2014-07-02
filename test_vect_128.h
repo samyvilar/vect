@@ -15,14 +15,33 @@
 
 #define SET_PRINTF_GREEN    "\x1B[32m"
 #define SET_PRINTF_RED      "\x1B[31m"
+#define SET_PRINTF_YELLOW   "\x1B[33m"
 #define RESTORE_PRINTF      "\x1B[0m"
-#define error(msg) ({printf("%s\n", msg); exit(-1); -1;})
-#define error_with_format(msg, format...) ({\
-    printf(SET_PRINTF_RED msg RESTORE_PRINTF, format); \
-    exit(-1); \
+
+#define set_str_color(s, color)  SET_PRINTF_ ## color s  RESTORE_PRINTF
+
+#define error(msg) ({printf(set_str_color("%s\n", RED), msg); exit(-1); -1;})
+#define error_with_format(msg, format...) ({    \
+    printf(set_str_color(msg, RED), format);    \
+    exit(-1);                                   \
     -1;})
 
-#define print_ok() printf(SET_PRINTF_GREEN "ok.\n" RESTORE_PRINTF)
+#define print_ok() printf(set_str_color("ok.\n", GREEN))
+
+#define print_test_vect_128_name(_test_oper, _test_type) \
+printf(                                         \
+    "test_vect_128_"                            \
+    set_str_color("%s", GREEN) "("              \
+    set_str_color("%s", YELLOW) "): "           \
+    ,macro_apply(stringify_token, _test_oper)   \
+    ,macro_apply(stringify_token, _test_type)   \
+)
+
+#define run_test_vect_128(_name, func, args) ({ \
+    print_test_vect_128_name(_name, args);      \
+    func(args);                                 \
+    print_ok();                                 \
+})
 
 #define native_scalr_flt_types  double, float
 #define native_scalr_sint_types signed long long int, signed long int, signed int, int, signed short int, short int, short, signed char, char
@@ -61,6 +80,22 @@ typedef unsigned char           uchar_t;
 #define test_memb_types native_scalr_types, typedef_native_sclar_types
 
 #define enable_test
+
+#define signed_long_long_int    signed long long int
+#define signed_long_int         signed long int
+#define signed_int              signed int
+#define signed_short_int        signed short int
+#define short_int               short int
+#define signed_char             signed char
+#define unsigned_long_long_int  unsigned long long int
+#define unsigned_long_int       unsigned long int
+#define unsigned_int            unsigned int
+#define unsigned_short          unsigned short
+#define unsigned_char           unsigned char
+
+#define stringify_token(_t) #_t
+
+#define test_vect_128_oper(_name) _test_vect_128_ ## _name
 
 
 #endif // __TEST_VECT_128_H__

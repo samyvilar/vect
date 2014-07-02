@@ -20,14 +20,7 @@ int main() { // test vect_128 member initialization ...
                 );                                                              \
     });
 
-    printf("test_vect_128_set: ");
-
-    #ifdef enable_test
-        MAP_2(_test_vect_set, test_memb_types)
-
-    #endif
-
-    print_ok();
+    run_test_vect_128(set, _test_vect_set, _test_type);
 
     return 0;
 }
