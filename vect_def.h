@@ -25,16 +25,17 @@
 //                   containing _memb_kind members each _memb_bit_mag bits
 
 
-#define vect_typedef(_vect_bit_mag, _memb_name)              \
+#define vect_typedef(_vect_bit_mag, _memb_name)                                             \
 /*      ^^^^^^^^^^^^ typedef internal vector type of:
         _vect_bit_mag(512, 256, 128) bits holding packed
         _memb_kind(flt, sint, uint) each
-        _memb_bit_mag(64, 32, 16, 8) bits */                                \
-    typedef union {                                                         \
-        vect_native_t(_vect_bit_mag, _memb_name) _v;                         \
-                                                                            \
-        _memb_name ## _t                                                    \
-        _m[sizeof(vect_native_t(_vect_bit_mag, _memb_name))/sizeof(_memb_name ## _t)];\
+        _memb_bit_mag(64, 32, 16, 8) bits */                                                \
+    typedef union {                                                                         \
+        vect_native_t(_vect_bit_mag, _memb_name) _v;                                        \
+                                                                                            \
+        _memb_name ## _t                                                                    \
+            _m[sizeof(vect_native_t(_vect_bit_mag, _memb_name))/sizeof(_memb_name ## _t)],  \
+            _;                                                                              \
     } vect_t_name(_vect_bit_mag, _memb_name)
 
 #define vect_native(v) ((v)._v) // returns native intrinsic vect type

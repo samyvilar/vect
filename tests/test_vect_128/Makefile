@@ -1,6 +1,6 @@
 
 CC=gcc
-CFLAGS=-Wall
+CFLAGS=-Wall -Wfatal-errors
 
 #$(call test_vect_128_, file_name)
 define test_vect_128_
