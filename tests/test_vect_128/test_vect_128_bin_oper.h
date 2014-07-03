@@ -36,7 +36,7 @@
                 scalr_str((char [128]){}, _res),                                                    \
                 scalr_str((char [128]){}, vect_memb(_vo, index))*/                                  \
            );                                                                                       \
-    /*for (index = 0; index < vect_memb_cnt(_vo_sclr_vect); index++)  {                               \
+    for (index = 0; index < vect_memb_cnt(_vo_sclr_vect); index++)  {                               \
         if ((_res = (scalr_oper(oper)(_a[0], _b[index]))) != vect_memb(_vo_sclr_vect, index))       \
             error_with_format(                                                                      \
                 "failed to broadcast operand a and apply operator vector_128_%s on types: %s\n"     \
@@ -52,7 +52,7 @@
                 "failed to broadcast operand a, b and apply operator vector_128_%s on types: %s\n"  \
                 ,#oper, #_memb_type                                                                 \
             );                                                                                      \
-    }*/                                                                                               \
+    }                                                                                               \
 });
 
 
