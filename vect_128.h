@@ -348,21 +348,24 @@ MAP(vect_128_typedef, scalrs_names)
 #undef vect_128_broad_cast
 #define vect_128_broad_cast(expr, dest) vect_128_unr_oper(broad_cast, expr, dest)
 
+#define vect_128_apply_bin_oper(oper, scalr_expr_t, operna, opernb) \
+    macro_apply(                                    \
+        scalr_switch,                               \
+        scalr_expr_t,                               \
+        MAP_LIST_APPLY_ARG(                         \
+            _vect_128_ ## oper ## _,                \
+            macro_pack_args(operna, opernb),        \
+            scalrs_names                            \
+        ),                                          \
+        (void)0                                     \
+     )
+
 /** BINARY operators *****************************************************************************/
 // apply binary operation ....
 #define vect_128_bin_oper(oper, oper_a, oper_b, dest) ( \
     vect_set_native(                                    \
         dest,                                           \
-        macro_apply(                                    \
-            scalr_switch,                               \
-            vect_memb_t(dest),                          \
-            MAP_LIST_APPLY_ARG(                         \
-                _vect_128_ ## oper ## _,                \
-                macro_pack_args(oper_a, oper_b),        \
-                scalrs_names                            \
-            ),                                          \
-            (void)0                                     \
-         )                                              \
+        vect_128_apply_bin_oper(oper, vect_memb_t(dest), oper_a, oper_b)   \
    ), dest)
 
 
@@ -951,57 +954,99 @@ MAP(vect_128_typedef, scalrs_names)
 #define vect_128_sign_ext(a, dest) vect_128_unr_oper(sign_ext, vect_native(a), dest)
 
 
+// Extract components by immediate index ...
+
+#ifndef __SSE4_1__
+    #define _mm_extract_epi64(a, _imm)                                      \
+        comp_select((_imm) == 0, _mm_cvtsi128_si64(a),                      \
+        comp_select((_imm) == 1, _mm_cvtsi128_si64(_mm_srli_si128(a, 8)),   \
+            _mm_cvtsi128_si64(_mm_srli_si128(a, ((_imm & 0b1) << 3)))))
+
+    #define _mm_extract_epi32(a, _imm)                                      \
+        comp_select((_imm) == 0, _mm_cvtsi128_si32(a),                      \
+        comp_select((_imm) == 1, _mm_cvtsi128_si32(_mm_srli_si128(a, 4)),   \
+        comp_select((_imm) == 2, _mm_cvtsi128_si32(_mm_srli_si128(a, 8)),   \
+        comp_select((_imm) == 4, _mm_cvtsi128_si32(_mm_srli_si128(a, 12)),  \
+            _mm_cvtsi128_si32(_mm_srli_si128(a, (_imm & 0b11) << 2))))))
+
+    #define _mm_extract_ps(a, _imm) \
+        _interp(_mm_extract_epi32(vect_128_cast_to_intgl_native(a), _imm), sint_bit_t(32), flt_bit_t(32))
+
+    // _mm_extract_epi16 1x(3, 1)
+    // shuffle 1x(1, 0.5)
+    // about 2 cycles ...
+    #define _mm_extract_epi8_ssse3(_va, _imm_)  ({              \
+        vect_128_intgl_native_t _va_ = (_va);                   \
+        comp_select(                                            \
+            (_imm_) < 8,                                        \
+            _mm_extract_epi16(                                  \
+                _mm_shuffle_epi8(                               \
+                    _va_,                                       \
+                    _mm_set_epi8(                               \
+                        0x80, 7, 0x80, 6, 0x80, 5, 0x80, 4,     \
+                        0x80, 3, 0x80, 2, 0x80, 1, 0x80, 0      \
+                    )                                           \
+                ),                                              \
+                _imm_                                           \
+             ),                                                 \
+        comp_select(                                            \
+            (_imm_) < 16,                                       \
+            _mm_extract_epi16(                                  \
+                _mm_shuffle_epi8(                               \
+                    _va_,                                       \
+                    _mm_set_epi8(                               \
+                        0x80, 15, 0x80, 14, 0x80, 13, 0x80, 12, \
+                        0x80, 11, 0x80, 10, 0x80, 9, 0x80, 8    \
+                    )                                           \
+               ),                                               \
+               (_imm_) - 8                                      \
+            ),                                                  \
+        _mm_cvtsi128_si32(_mm_srli_si128(_va_, (_imm_) & 15)) & 0xFF)); })
+
+    // _mm_extract_epi16 1x(1, 0.5)
+    // _mm_unpack*_epi8: 1x(1, 0.5)
+    // _mm_setzero_si128: 1x(1, 0.33)  (about 3 cycles)
+    #define _mm_extract_epi8_sse2(va, _imm)                         \
+        comp_select(                                                \
+            (_imm) < 8,                                             \
+            _mm_extract_epi16(                                      \
+                _mm_unpacklo_epi8(va, _mm_setzero_si128()),         \
+                _imm                                                \
+             ),                                                     \
+        comp_select(                                                \
+            (_imm) < 16,                                            \
+            _mm_extract_epi16(                                      \
+                _mm_unpackhi_epi8(va, _mm_setzero_si128()),         \
+                (_imm) - 8                                          \
+            ),                                                      \
+        _mm_cvtsi128_si32(_mm_srli_si128(va, (_imm) & 15)) & 0xFF ))
+
+    #ifdef __SSSE3__
+        #define _mm_extract_epi8 _mm_extract_epi8_ssse3
+    #else
+        #define _mm_extract_epi8 _mm_extract_epi8_sse2
+    #endif
+
+
+#endif
+
+
 // etract member from vectors ...
-#define vect_128_extrt_flt64bit(a, _imm) ({                             \
-    double _m;                                                          \
-    switch (_imm) {                                                     \
-        case 0: _m = _mm_cvtsd_f64(a, 0); break ;                       \
-        case 1: _m = _mm_cvtsd_f64(_mm_srli_si128(a, 8), 0); break ;    \
-        default: assert_with_msg(0, "expected either 0, 1");            \
-    }                                                                   \
-    _m; })
+#define vect_128_extrt_imm_flt64bit(va_, _imm)      _interp(vect_128_extrt_imm_sint64bit(va_, _imm), sint_bit_t(64), flt_bit_t(64))
+#define vect_128_extrt_imm_flt32bit(va_, _imm)      _mm_extract_ps(va_, _imm)
 
-#define vect_128_extr_flt32bit(a, _imm) ({                                 \
-    float _hd;                                                             \
-    switch (_imm) {                                                        \
-        case 0: _hd = _mm_cvtss_f32(a, _imm); break ;                      \
-        case 1: _hd = _mm_cvtss_f32(_mm_srli_si128(a, 4)); break ;         \
-        case 2: _hd = _mm_cvtss_f32(_mm_srli_si128(a, 8)); break ;         \
-        case 3: _hd = _mm_cvtss_f32(_mm_srli_si128(a, 12)); break ;        \
-        default: assert_with_msg(0, "expecting either 0, 1, 2, 3");        \
-        }                                                                  \
-    _hd; })
+#define vect_128_extrt_imm_sint64bit(va_, _imm)     _mm_extract_epi64(vect_128_cast_to_intgl_native(va_), _imm)
+#define vect_128_extrt_imm_sint32bit(va_, _imm)     _mm_extract_epi32(vect_128_cast_to_intgl_native(va_), _imm)
+#define vect_128_extrt_imm_sint16bit(va_, _imm)     ((sint_bit_t(16))_mm_extract_epi16(vect_128_cast_to_intgl_native(va_), _imm))
+#define vect_128_extrt_imm_sint8bit(va_, _imm)      ((sint_bit_t(8))_mm_extract_epi8(vect_128_cast_to_intgl_native(va_), _imm))
 
+#define vect_128_extrt_imm_uint64bit(va_, _imm)     ((uint_bit_t(64))vect_128_extrt_imm_sint64bit(va_, _imm))
+#define vect_128_extrt_imm_uint32bit(va_, _imm)     ((uint_bit_t(32))vect_128_extrt_imm_sint32bit(va_, _imm))
+#define vect_128_extrt_imm_uint16bit(va_, _imm)     ((uint_bit_t(16))vect_128_extrt_imm_sint16bit(va_, _imm))
+#define vect_128_extrt_imm_uint8bit(va_, _imm)      ((uint_bit_t(8))vect_128_extrt_imm_sint8bit(va_, _imm))
+#define _vect_128_extrt_imm_(_memb_kind) _vect_128_native_bin_oper(extrt_imm, _memb_kind)
 
-#define vect_128_extrt_sint8bit(a, _im) rshift_logcl(_mm_extract_epi16(a, _im >> 1), 8 * (_im & 1))
-#define vect_128_extrt_uint8bit(a, _im) ((uint_bit_t(8))vect_128_extrt_8_s_int(a, _im))
-
-#define vect_128_extrt_sint16bit _mm_extract_epi16
-#define vect_128_extrt_uint16bit(a, _im) ((uint_bit_t(16))vect_128_extrt_16_s_int(a, _im))
-
-#define vect_128_extrt_sint32bit(_a, _imm) ({                       \
-    s _m;                                                               \
-    switch (_imm) {                                                     \
-        case 0: _m = _mm_cvtsi128_si32(_a); break ;                     \
-        case 1: _m = _mm_cvtsi128_si32(_mm_srli_si128(_a, 4)); break ;  \
-        case 2: _m = _mm_cvtsi128_si32(_mm_srli_si128(_a, 8)); break ;  \
-        case 3: _m = _mm_cvtsi128_si32(_mm_srli_si128(_a, 12)); break ; \
-        default: assert_with_msg(0, "expected either 0, 1, 2, 3");      \
-    }                                                                   \
-_m; })
-
-#define vect_128_extrt_uint32bit(a, _imm) (uint_bit_t(32))(vect_128_extrt_32_s_int(a, _imm))
-
-#define vect_128_extrt_64_s_int(a, _im) ({                                    \
-        sint_bit_t(64) _m;                                                        \
-        switch (_im) {                                                            \
-            case 0: _m = _mm_cvtsi128_si64(a); break ;                            \
-            case 1: _m = _mm_cvtsi128_si64(_mm_srli_si128(a, 8));  break ;        \
-            default: assert_with_msg(0, "expected either 0 or 1");                \
-        } _m; })
-#define vect_128_extrt_64_uint(a, _im) ((uint_bit_t(64))vect_128_extrt_64_s_int(a, _im))
-
-// sse2 can only extract the lower 64 bit number for the upper we need to either shuffer or shift
+#define vect_128_extrt_imm(va, imm) vect_128_apply_bin_oper(extrt_imm, vect_memb_t(va), vect_native(va), imm)
 
 
 
