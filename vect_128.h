@@ -46,10 +46,10 @@
 #define vect_128_mul            vect_128_no_supprt
 #define vect_128_div            vect_128_no_supprt
 
-#define vect_128_lshft          vect_128_no_supprt
+#define vect_128_lshift          vect_128_no_supprt
 
-#define vect_128_rshft_arith    vect_128_no_supprt
-#define vect_128_rshft_logic    vect_128_no_supprt
+#define vect_128_rshift_arith    vect_128_no_supprt
+#define vect_128_rshift_logic    vect_128_no_supprt
 
 #define vect_128_extrt          vect_128_no_supprt
 
@@ -142,6 +142,21 @@ MAP(vect_128_typedef, scalrs_names)
 
 
 #define vect_128_native_intrs(_oper_name, _memb_kind) _mm_ ## _oper_name
+
+/* Zero operand operations ************************************************************************************/
+#define vect_128_set_zero_flt64bit  _mm_setzero_pd
+#define vect_128_set_zero_flt32bit  _mm_setzero_ps
+#define vect_128_set_zero_intgl     _mm_setzero_si128
+#define vect_128_set_zero_sint64bit vect_128_set_zero_intgl
+#define vect_128_set_zero_sint32bit vect_128_set_zero_intgl
+#define vect_128_set_zero_sint16bit vect_128_set_zero_intgl
+#define vect_128_set_zero_sint8bit  vect_128_set_zero_intgl
+#define vect_128_set_zero_uint64bit vect_128_set_zero_intgl
+#define vect_128_set_zero_uint32bit vect_128_set_zero_intgl
+#define vect_128_set_zero_uint16bit vect_128_set_zero_intgl
+#define vect_128_set_zero_uint8bit  vect_128_set_zero_intgl
+#define _vect_128_set_zero_(_mem_kind) vect_128_set_zero_ ## _mem_kind
+
 
 
 /***** STORE 128 bit vectors *******************************************************************************************/
@@ -330,20 +345,55 @@ MAP(vect_128_typedef, scalrs_names)
 
 
 /** BINARY operators *****************************************************************************/
-// if either operand is a scalar of the same type as the others vectors member type it will be broadcasted
-// otherwise a compilation error is emitted ...
+// apply binary operation ....
+#define vect_128_bin_oper(oper, oper_a, oper_b, dest) ( \
+    vect_set_native(                                    \
+        dest,                                           \
+        macro_apply(                                    \
+            scalr_switch,                               \
+            vect_memb_t(dest),                          \
+            MAP_LIST_APPLY_ARG(                         \
+                _vect_128_ ## oper ## _,                \
+                macro_pack_args(oper_a, oper_b),        \
+                scalrs_names                            \
+            ),                                          \
+            (void)0                                     \
+         )                                              \
+   ), dest)
 
-// Binary Bit intrinsics, either both operands are the same vect_native types (bit_size, memb_type)
-//  OR: one of them is scalar type of the same type as the vectors members type memb_type
-//  in which case the scalar will be broadcasted before the intrinsic is applied,
-// @@>> IN neither case a compilation ERROR is emitted!
-//
-//  if operands are OK intrisic is applied creating a new vect_t of the same kind as the operands
-//      and returned ....
+
+#define expr_from_possbl_vect(expr, _type) (((union {_type _val; typeof(expr) _e;}){._e = (expr)})._val)
+// broadcast scalar if _opern is an expr with a scalr eitherwise try to return the native vector
+#define vect_128_broad_cast_if_scalr(_opern, _vect)                     \
+    scalr_switch(                                                       \
+        _opern,                                                         \
+        _mm_set1_pd(expr_from_possbl_vect(_opern,       double)),       \
+        _mm_set1_ps(expr_from_possbl_vect(_opern,       float)),        \
+        _mm_set1_epi64x(expr_from_possbl_vect(_opern,   long long)),    \
+        _mm_set1_epi32(expr_from_possbl_vect(_opern,    int)),          \
+        _mm_set1_epi16(expr_from_possbl_vect(_opern,    short)),        \
+        _mm_set1_epi8(expr_from_possbl_vect(_opern,     char)),         \
+        _mm_set1_epi64x(expr_from_possbl_vect(_opern,   long long)),    \
+        _mm_set1_epi32(expr_from_possbl_vect(_opern,    int)),          \
+        _mm_set1_epi16(expr_from_possbl_vect(_opern,    short)),        \
+        _mm_set1_epi8(expr_from_possbl_vect(_opern,     char)),         \
+        vect_native(expr_from_possbl_vect(_opern, typeof(_vect)))       \
+    )
+
+// if either or both operands is a scalar then they will be broadcasted based on the dest vector
+// before the operation is applied ...
+#define vect_128_bin_oper_broad_casted_scalrs(oper, oper_a, oper_b, dest) \
+    vect_128_bin_oper(                                  \
+        oper,                                           \
+        vect_128_broad_cast_if_scalr(oper_a, dest),     \
+        vect_128_broad_cast_if_scalr(oper_b, dest),     \
+        dest                                            \
+    )
 
 
-#define vect_128_bin_cast_to_(a, b, cast_to) \
-    (vect_128_cast_to_ ## cast_to ## _native(a), vect_128_cast_to_ ## cast_to ## _native(b))
+
+#define vect_128_bin_cast_to_(_cast_a, _cast_b, cast_to) \
+    (vect_128_cast_to_ ## cast_to ## _native(_cast_a), vect_128_cast_to_ ## cast_to ## _native(_cast_b))
 
 #define _vect_128_native_bin_oper(oper, _memb_kind) \
     vect_128_ ## oper ## _ ## _memb_kind macro_cons_parens
@@ -389,67 +439,6 @@ MAP(vect_128_typedef, scalrs_names)
 #define vect_128_and_uint8bit           vect_128_and_intgl
 #define _vect_128_and_(_memb_kind)       _vect_128_native_bin_oper(and, _memb_kind)
 
-// TODO: figure out a way to detect scalar type and broadcast ...
-
-#define vect_128_broad_cast_if_flt64bit    _mm_set1_pd
-#define vect_128_broad_cast_if_flt32bit    _mm_set1_ps
-#define vect_128_broad_cast_if_sint8bit    _mm_set1_epi8
-#define vect_128_broad_cast_if_sint16bit   _mm_set1_epi16
-#define vect_128_broad_cast_if_sint32bit   _mm_set1_epi32
-#define vect_128_broad_cast_if_sint64bit   _mm_set1_epi64x
-#define vect_128_broad_cast_if_uint8bit    vect_128_broad_cast_sint8bit
-#define vect_128_broad_cast_if_uint16bit   vect_128_broad_cast_sint16bit
-#define vect_128_broad_cast_if_uint32bit   vect_128_broad_cast_sint32bit
-#define vect_128_broad_cast_if_uint64bit   vect_128_broad_cast_sint64bit
-
-
-
-#define expr_from_possbl_vect(expr, _type) (((union {_type _val; typeof(expr) _e;}){._e = (expr)})._val)
-
-#define vect_128_broad_cast_if_scalr(_opern, _vect)                     \
-    scalr_switch(                                                       \
-        _opern,                                                         \
-        _mm_set1_pd(expr_from_possbl_vect(_opern,       double)),       \
-        _mm_set1_ps(expr_from_possbl_vect(_opern,       float)),        \
-        _mm_set1_epi64x(expr_from_possbl_vect(_opern,   long long)),    \
-        _mm_set1_epi32(expr_from_possbl_vect(_opern,    int)),          \
-        _mm_set1_epi16(expr_from_possbl_vect(_opern,    short)),        \
-        _mm_set1_epi8(expr_from_possbl_vect(_opern,     char)),         \
-        _mm_set1_epi64x(expr_from_possbl_vect(_opern,   long long)),    \
-        _mm_set1_epi32(expr_from_possbl_vect(_opern,    int)),          \
-        _mm_set1_epi16(expr_from_possbl_vect(_opern,    short)),        \
-        _mm_set1_epi8(expr_from_possbl_vect(_opern,     char)),         \
-        vect_native(expr_from_possbl_vect(_opern, typeof(_vect)))       \
-    )
-
-#define vect_128_bin_oper(oper, oper_a, oper_b, dest) (                 \
-    vect_set_native(                                                    \
-        dest,                                                           \
-        macro_apply(                                                    \
-            scalr_switch,                                               \
-            vect_memb_t(dest),                                          \
-            MAP_LIST_APPLY_ARG(                                         \
-                _vect_128_ ## oper ## _,                                \
-                macro_pack_args(                                        \
-                    vect_128_broad_cast_if_scalr(oper_a, dest),         \
-                    vect_128_broad_cast_if_scalr(oper_b, dest)          \
-                ),                                                      \
-                scalrs_names                                            \
-            ),                                                          \
-            (void)0                                                     \
-         )                                                              \
-   ), dest)
-
-
-
-#undef vect_128_and
-#define vect_128_and(a, b, out)  vect_128_bin_oper(and, a, b, out)
-#undef vect_128_or
-#define vect_128_or(a, b, out)   vect_128_bin_oper(or, a, b, out)
-#undef vect_128_xor
-#define vect_128_xor(a, b, out)  vect_128_bin_oper(xor, a, b, out)
-
-
 
 // add two 128 bit vectors
 #define vect_128_add_flt64bit(a, b)     _mm_add_pd      vect_128_bin_cast_to_(a, b, flt64bit)
@@ -464,9 +453,6 @@ MAP(vect_128_typedef, scalrs_names)
 #define vect_128_add_uint64bit          vect_128_add_sint64bit
 #define _vect_128_add_(_memb_kind)      _vect_128_native_bin_oper(add, _memb_kind)
 
-#undef vect_128_add
-#define vect_128_add(a, b, out)        vect_128_bin_oper(add, a, b, out)
-
 
 // sub two vectors
 #define vect_128_sub_flt64bit(a, b)     _mm_sub_pd      vect_128_bin_cast_to_(a, b, flt64bit)
@@ -480,10 +466,6 @@ MAP(vect_128_typedef, scalrs_names)
 #define vect_128_sub_uint32bit          vect_128_sub_sint32bit
 #define vect_128_sub_uint64bit          vect_128_sub_sint64bit
 #define _vect_128_sub_(_memb_kind)      _vect_128_native_bin_oper(sub, _memb_kind)
-
-#undef vect_128_sub
-#define vect_128_sub(a, b, out)     vect_128_bin_oper(sub, a, b, out)
-
 
 
 // mul two vectors
@@ -537,29 +519,29 @@ MAP(vect_128_typedef, scalrs_names)
     #define vect_128_mul_sint32bit _mm_mullo_epi32
 #else
 // multiplies the the low and high 32 bits each creating a 64 bit unsigned result ...
-#define vect_128_mul_sint32bit(a, b) ({               \
-        vect_128_intgl_native_t                       \
-            va = vect_128_cast_to_intgl_native(a),    \
-            vb = vect_128_cast_to_intgl_native(b);    \
-        _mm_unpacklo_epi32(                         \
-            _mm_shuffle_epi32(                      \
-                _mm_mul_epu32(va, vb),              \
-                _MM_SHUFFLE (0,0,2,0)               \
-            ),                                      \
-            _mm_shuffle_epi32(                      \
-                _mm_mul_epu32(                      \
-                    _mm_srli_si128(va, 4),          \
-                    _mm_srli_si128(vb, 4)           \
-                ),                                  \
-                _MM_SHUFFLE(0,0,2,0)                \
-            )                                       \
+#define vect_128_mul_sint32bit(a, b) ({                 \
+        vect_128_intgl_native_t                         \
+            va = vect_128_cast_to_intgl_native(a),      \
+            vb = vect_128_cast_to_intgl_native(b);      \
+        _mm_unpacklo_epi32(                             \
+            _mm_shuffle_epi32(                          \
+                _mm_mul_epu32(va, vb),                  \
+                _MM_SHUFFLE (0,0,2,0)                   \
+            ),                                          \
+            _mm_shuffle_epi32(                          \
+                _mm_mul_epu32(                          \
+                    _mm_srli_si128(va, 4),              \
+                    _mm_srli_si128(vb, 4)               \
+                ),                                      \
+                _MM_SHUFFLE(0,0,2,0)                    \
+            )                                           \
         );  })
 #endif
 #define vect_128_mul_uint32bit vect_128_mul_sint32bit
 
 
-#define vect_128_mul_sint16bit(a, b)      _mm_mullo_epi16 vect_128_bin_cast_to_(a, b, intgl)
-#define vect_128_mul_uint16bit      vect_128_mul_sint16bit
+#define vect_128_mul_sint16bit(a, b)    _mm_mullo_epi16 vect_128_bin_cast_to_(a, b, intgl)
+#define vect_128_mul_uint16bit          vect_128_mul_sint16bit
 
 
 #ifdef __SSE4_1__
@@ -658,88 +640,96 @@ MAP(vect_128_typedef, scalrs_names)
         )                                               \
     ); })
 
-// mul_ssse3_sint8bit slightly slower ...
+// mul_ssse3_sint8bit seems slightly slower ...
 #define vect_128_mul_sint8bit vect_128_mul_sse2_sint8bit
 #define vect_128_mul_uint8bit vect_128_mul_sint8bit
-
 #define _vect_128_mul_(_memb_kind) _vect_128_native_bin_oper(mul, _memb_kind)
-
-#undef vect_128_mul
-#define vect_128_mul(a, b, out) vect_128_bin_oper(mul, a, b, out)
 
 
 // div two vectors
 #define vect_128_div_flt64div   _mm_div_pd
 #define vect_128_div_flt32div   _mm_div_ps
+// @@TODO: Implmenet integral division (test whether multithreaded code may be faster) ...
 
-// TODO: Implmenet integral division using multithreaded code ...
+
+#undef vect_128_and
+#define vect_128_and(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(and, a, b, out)
+#undef vect_128_or
+#define vect_128_or(a, b, out)   vect_128_bin_oper_broad_casted_scalrs(or, a, b, out)
+#undef vect_128_xor
+#define vect_128_xor(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(xor, a, b, out)
+#undef vect_128_add
+#define vect_128_add(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(add, a, b, out)
+#undef vect_128_sub
+#define vect_128_sub(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(sub, a, b, out)
+#undef vect_128_mul
+#define vect_128_mul(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(mul, a, b, out)
+
 /**************************************************************************************************/
 
-// SSE supports shifts either by immediates or scalars
 
-#define vect_128_lshft_imm_flt32bit(a, _imm) _mm_castsi128_ps(vect_128_lshft_imm_sint32bit(_mm_castps_si128(a), _imm))
-#define vect_128_lshft_imm_flt64bit(a, _imm) _mm_castsi128_pd(vect_128_lshft_imm_sint64bit(_mm_castpd_si128(a), _imm))
+#define vect_128_bin_oper_select_scalr_imm_oper(oper, a, _sclar_or_imm, dest)       \
+    comp_select(                                                                    \
+        comp_expr_is_imm(_sclar_or_imm),                                            \
+        vect_128_bin_oper(oper ## _imm, a, _sclar_or_imm, dest),                    \
+        vect_128_bin_oper(oper ## _scalr, a, _sclar_or_imm, dest)                   \
+    )
+
 
 // theres no 8 bit left shift but we can simulated by doing a 16 bit left shift
-// and zeroing out the appropriate bits ...
+// and zeroing out the appropriate top bits ...
 // reqs:
 //  _mm_and_si128: 1x(1, 0.33)
 //  _mm_slli_epi16: 1x(1, 1)
 // _mm_set1_epi16: ~ 1x(1, 0) (so about 2-3 cycles)
-#define vect_128_lshft_imm_sint8bit(a, _imm) _mm_and_si128(_mm_slli_epi16(a, _imm), _mm_set1_epi16((short)((short)-1 << (_imm))))
+#ifndef _mm_slli_epi8
+    #define _mm_slli_epi8(a, _imm) \
+        _mm_and_si128(_mm_slli_epi16(a, _imm), _mm_set1_epi8(-1 << (_imm)))
+#endif
 
-#define vect_128_lshft_imm_sint16bit    _mm_slli_epi16
-#define vect_128_lshft_imm_sint32bit    _mm_slli_epi32
-#define vect_128_lshft_imm_sint64bit    _mm_slli_epi64
+#ifndef _mm_sll_epi8
+    #define _mm_sll_epi8(a, b) \
+        _mm_and_si128(_mm_sll_epi16(a, _mm_set1_epi64x(b)), _mm_set1_epi8(0xFFU << (b)))
+#endif
 
-#define vect_128_lshft_imm_uint8bit     vect_128_lshft_imm_sint8bit
-#define vect_128_lshft_imm_uint16bit    vect_128_lshft_imm_sint16bit
-#define vect_128_lshft_imm_uint32bit    vect_128_lshft_imm_sint32bit
-#define vect_128_lshft_imm_uint64bit    vect_128_lshft_imm_sint64bit
 
+
+/** vect_128 right shift by immediate ... ********************************************************/
+
+#ifndef _mm_srli_epi8
 // theres no 8 bit logical right shift but we can simulated by doing
 // a 16 bit logical right shift and zero out the appropriate parts
 // reqs:
 //      _mm_and_si128   1x(1, 0.33)
 //      _mm_srli_epi16  1x(1, 1)
 //      _mm_set1_epi16  1x(1, 0) (so about 2-3 cycles)
-#define vect_128_rshift_logic_imm_sint8bit(a, _imm)  _mm_and_si128(_mm_srli_epi16(a, _imm), _mm_set1_epi16((sint16bit_t)-1 >> (_imm)))
-#define vect_128_rshift_logic_imm_sint16bit _mm_srli_epi16
-#define vect_128_rshift_logic_imm_sint32bit _mm_srli_epi32
-#define vect_128_rshift_logic_imm_sint64bit _mm_srli_epi64
+    #define _mm_srli_epi8(a, b) _mm_and_si128(_mm_srli_epi16(a, b), _mm_set1_epi8(0xFF >> (b)))
+#endif
 
-// theres no 8 bit arithmetic right shift, but we can simulated.
-// reqs:
-//      _mm_or_si128: 1x                    1x(1, 0.33)
-//      vect_128_rshift_logic_imm_sint8bit: 1x(3, 1)
-//      vect_128_lshift_imm_sint8bit:       1x(3, 1)
-//      _mm_cmplt_epi8:                     1x(1, 0.5)
-//      _mm_setzero_si128:                  1x(1, 0.33) (so about 9 cycles)
-#define vect_128_rshft_arith_imm_sint8bit_0(v, _imm) ({           \
-    vect_128_intgl_native_t _t = (v);                           \
-    _mm_or_si128(                                               \
-        vect_128_rshift_logic_imm_sint8bit(_t, _imm),           \
-        vect_128_lshift_imm_sint8bit(_mm_cmplt_epi8(_t, _mm_setzero_si128()), (8 - _imm)\
-    )); })
 
+
+#ifndef _mm_srai_epi8
+// theres no 8 bit right arithmetic shift simulated using 16 bit arith right shift
 // requires about 7 cycles ...
-#define vect_128_rshft_arith_imm_sint8bit_1(v, _imm) ({                     \
-    vect_128_intgl_native_t _t = (v);                                       \
-    _mm_or_si128(                                                           \
-        _mm_and_si128(                                                      \
-            _mm_srai_epi16(_t, _imm),                                       \
-            _mm_set1_epi8(                                                  \
-                255, 0, 255, 0, 255, 0, 255, 0,                             \
-                255, 0, 255, 0, 255, 0, 255, 0                              \
-            )                                                               \
-        ),                                                                  \
-        _mm_srli_epi16(_mm_srai_epi16(_mm_slli_epi16(v, 8), imm), 8));      \
-    })
+#define _mm_srai_epi8(_t, _imm) ({                      \
+    vect_128_intgl_native_t v = (_t);                   \
+    _mm_or_si128(                                       \
+        _mm_and_si128(                                  \
+            _mm_srai_epi16(v, _imm),                    \
+            _mm_set_epi8(                               \
+                255, 0, 255, 0, 255, 0, 255, 0,         \
+                255, 0, 255, 0, 255, 0, 255, 0          \
+            )                                           \
+        ),                                              \
+        _mm_srli_epi16(                                 \
+            _mm_srai_epi16(_mm_slli_epi16(v, 8), _imm), \
+            8                                           \
+        )                                               \
+    );                                                  \
+})
+#endif
 
-#define vect_128_rshft_arith_imm_sint8bit   vect_128_rshft_arith_imm_sint8bit_1
-#define vect_128_rshft_arith_imm_sint16bit _mm_srai_epi16
-#define vect_128_rshft_arith_imm_sint32bit _mm_srai_epi32
-
+#ifndef _mm_srai_epi64
 // theres no right 64 bit arithmetic shift we emualted by first doing a logical left shift or it with 1s
 // we load the duplicate high 32 bits in each half and check if they are less than 0
 // if they are they will be set to -1 if not they will be set to 0, then simply left shift the -1s
@@ -749,9 +739,8 @@ MAP(vect_128_typedef, scalrs_names)
 //      _mm_cmplt_epi32     1x(1, 0.5),
 //      _mm_slli_epi64      1x(1, 1),
 //      _mm_srli_epi64      1x(1, 1),
-//      _mm_or_si128        1x(1, 0.33) == 6 instrs
-
-#define vect_128_rshft_arith_imm_sint64bit(v, _imm) ({              \
+//      _mm_or_si128        1x(1, 0.33) (about 6 cycles)
+#define _mm_srai_epi64(v, _imm) ({                                  \
     vect_128_intgl_native_t _t = (v);                               \
     _mm_or_si128(                                                   \
         _mm_srli_epi64(_t, _imm),                                   \
@@ -763,10 +752,179 @@ MAP(vect_128_typedef, scalrs_names)
             (64 - (_imm))                                           \
         )                                                           \
     ); })
+#endif
+
+#define _vect_128_shift_native(shift_dirctn, shift_kind, shift_mag_kind, opern_bit_size, a, b) \
+    _mm_s ## shift_dirctn ## shift_kind ## shift_mag_kind ## _epi ## opern_bit_size(vect_128_cast_to_intgl_native(a), b)
+
+#define _vect_128_logic_left_shift_imm_native(bit_size, __va, _imm)    _vect_128_shift_native(l, l, i, bit_size, __va, _imm)
+#define _vect_128_logic_right_shift_imm_native(bit_size, __va, _imm)   _vect_128_shift_native(r, l, i, bit_size, __va, _imm)
+#define _vect_128_arith_right_shift_imm_native(bit_size, __va, _imm)   _vect_128_shift_native(r, a, i, bit_size, __va, _imm)
+
+#define _vect_128_logic_left_shift_scalr_native(bit_size, __va, scalr_b)   _vect_128_shift_native(l, l, ,bit_size, __va, _mm_set1_epi64x(scalr_b))
+#define _vect_128_logic_right_shift_scalr_native(bit_size, __va, scalr_b)  _vect_128_shift_native(r, l, ,bit_size, __va, _mm_set1_epi64x(scalr_b))
+#define _vect_128_arith_right_shift_scalr_native(bit_size, __va, scalr_b)  _vect_128_shift_native(r, a, ,bit_size, __va, _mm_set1_epi64x(scalr_b))
 
 
+#define vect_128_lshift_imm_flt64bit(a, _mag_imm)   _mm_castsi128_pd(vect_128_lshift_imm_sint64bit(a, _mag_imm))
+#define vect_128_lshift_imm_flt32bit(a, _mag_imm)   _mm_castsi128_ps(vect_128_lshift_imm_sint32bit(a, _mag_imm))
+#define vect_128_lshift_imm_sint64bit(a, _mag_imm)  _vect_128_logic_left_shift_imm_native(64, a, _mag_imm)
+#define vect_128_lshift_imm_sint32bit(a, _mag_imm)  _vect_128_logic_left_shift_imm_native(32, a, _mag_imm)
+#define vect_128_lshift_imm_sint16bit(a, _mag_imm)  _vect_128_logic_left_shift_imm_native(16, a, _mag_imm)
+#define vect_128_lshift_imm_sint8bit(a, _mag_imm)   _vect_128_logic_left_shift_imm_native(8, a, _mag_imm)
+#define vect_128_lshift_imm_uint64bit               vect_128_lshift_imm_sint64bit
+#define vect_128_lshift_imm_uint32bit               vect_128_lshift_imm_sint32bit
+#define vect_128_lshift_imm_uint16bit               vect_128_lshift_imm_sint16bit
+#define vect_128_lshift_imm_uint8bit                vect_128_lshift_imm_sint8bit
+#define _vect_128_lshift_imm_(_memb_kind) _vect_128_native_bin_oper(lshift_imm, _memb_kind)
 
 
+#define vect_128_lshift_scalr_flt64bit(a, b)    _mm_castsi128_pd(vect_128_lshift_scalr_sint64bit(a, b))
+#define vect_128_lshift_scalr_flt32bit(a, b)    _mm_castsi128_ps(vect_128_lshift_scalr_sint32bit(a, b))
+#define vect_128_lshift_scalr_sint64bit(a, b)   _vect_128_logic_left_shift_scalr_native(64, a, b)
+#define vect_128_lshift_scalr_sint32bit(a, b)   _vect_128_logic_left_shift_scalr_native(32, a, b)
+#define vect_128_lshift_scalr_sint16bit(a, b)   _vect_128_logic_left_shift_scalr_native(16, a, b)
+#define vect_128_lshift_scalr_sint8bit(a, b)    ({  \
+    typeof(b) scalr_b = (b);                        \
+    _mm_and_si128(                                  \
+        _mm_sll_epi16(                              \
+            vect_128_cast_to_intgl_native(a),       \
+            _mm_set1_epi64x(scalr_b)                \
+        ),                                          \
+        _mm_set1_epi8(0xFFU << (scalr_b))           \
+    ); })
+#define vect_128_lshift_scalr_uint64bit         vect_128_lshift_scalr_sint64bit
+#define vect_128_lshift_scalr_uint32bit         vect_128_lshift_scalr_sint32bit
+#define vect_128_lshift_scalr_uint16bit         vect_128_lshift_scalr_sint16bit
+#define vect_128_lshift_scalr_uint8bit          vect_128_lshift_scalr_sint8bit
+#define _vect_128_lshift_scalr_(_memb_kind) _vect_128_native_bin_oper(lshift_scalr, _memb_kind)
+
+
+#define vect_128_rshift_logic_imm_flt64bit(a, _imm)     _mm_castsi128_pd(vect_128_rshift_logic_imm_sint64bit(a, _imm))
+#define vect_128_rshift_logic_imm_flt32bit(a, _imm)     _mm_castsi128_ps(vect_128_rshift_logic_imm_sint32bit(a, _imm))
+#define vect_128_rshift_logic_imm_sint64bit(a, _imm)    _vect_128_logic_right_shift_imm_native(64, a, _imm)
+#define vect_128_rshift_logic_imm_sint32bit(a, _imm)    _vect_128_logic_right_shift_imm_native(32, a, _imm)
+#define vect_128_rshift_logic_imm_sint16bit(a, _imm)    _vect_128_logic_right_shift_imm_native(16, a, _imm)
+#define vect_128_rshift_logic_imm_sint8bit(a, _imm)    _vect_128_logic_right_shift_imm_native(8, a, _imm)
+#define vect_128_rshift_logic_imm_uint64bit         vect_128_rshift_logic_imm_sint64bit
+#define vect_128_rshift_logic_imm_uint32bit         vect_128_rshift_logic_imm_sint32bit
+#define vect_128_rshift_logic_imm_uint16bit         vect_128_rshift_logic_imm_sint16bit
+#define vect_128_rshift_logic_imm_uint8bit          vect_128_rshift_logic_imm_sint8bit
+#define _vect_128_rshift_logic_imm_(_memb_kind)     _vect_128_native_bin_oper(rshift_logic_imm, _memb_kind)
+
+
+#define vect_128_rshift_logic_scalr_flt64bit(a, scalr_b)    _mm_castsi128_pd(vect_128_rshift_logic_scalr_sint64bit(a, scalr_b))
+#define vect_128_rshift_logic_scalr_flt32bit(a, scalr_b)    _mm_castsi128_ps(vect_128_rshift_logic_scalr_sint32bit(a, scalr_b))
+#define vect_128_rshift_logic_scalr_sint64bit(a, scalr_b)   _vect_128_logic_right_shift_scalr_native(64, a, scalr_b)
+#define vect_128_rshift_logic_scalr_sint32bit(a, scalr_b)   _vect_128_logic_right_shift_scalr_native(32, a, scalr_b)
+#define vect_128_rshift_logic_scalr_sint16bit(a, scalr_b)   _vect_128_logic_right_shift_scalr_native(16, a, scalr_b)
+#define vect_128_rshift_logic_scalr_sint8bit(a, scalr_b)    ({          \
+    typeof(scalr_b) shft_mag = (scalr_b);                               \
+    vect_128_intgl_native_t _va_ = vect_128_cast_to_intgl_native(a);    \
+    _mm_and_si128(                                                      \
+        _mm_srl_epi16(_va_, _mm_set1_epi64x(shft_mag)),                 \
+        _mm_set1_epi8(0xFFU >> shft_mag)                                \
+    );                                                                  \
+})
+#define vect_128_rshift_logic_scalr_uint64bit   vect_128_rshift_logic_scalr_sint64bit
+#define vect_128_rshift_logic_scalr_uint32bit   vect_128_rshift_logic_scalr_sint32bit
+#define vect_128_rshift_logic_scalr_uint16bit   vect_128_rshift_logic_scalr_sint16bit
+#define vect_128_rshift_logic_scalr_uint8bit    vect_128_rshift_logic_scalr_sint8bit
+#define _vect_128_rshift_logic_scalr_(_memb_kind)   _vect_128_native_bin_oper(rshift_logic_scalr, _memb_kind)
+
+
+#define vect_128_rshift_arith_imm_flt64bit(a, _imm)     _mm_castsi128_pd(vect_128_rshift_arith_imm_sint64bit(a, _imm))
+#define vect_128_rshift_arith_imm_flt32bit(a, _imm)     _mm_castsi128_ps(vect_128_rshift_arith_imm_sint32bit(a, _imm))
+#define vect_128_rshift_arith_imm_sint64bit(a, _imm)    _vect_128_arith_right_shift_imm_native(64, a, _imm)
+#define vect_128_rshift_arith_imm_sint32bit(a, _imm)    _vect_128_arith_right_shift_imm_native(32, a, _imm)
+#define vect_128_rshift_arith_imm_sint16bit(a, _imm)    _vect_128_arith_right_shift_imm_native(16, a, _imm)
+#define vect_128_rshift_arith_imm_sint8bit(a, _imm)     _vect_128_arith_right_shift_imm_native(8, a, _imm)
+#define vect_128_rshift_arith_imm_uint64bit             vect_128_rshift_arith_imm_sint64bit
+#define vect_128_rshift_arith_imm_uint32bit             vect_128_rshift_arith_imm_sint32bit
+#define vect_128_rshift_arith_imm_uint16bit             vect_128_rshift_arith_imm_sint16bit
+#define vect_128_rshift_arith_imm_uint8bit              vect_128_rshift_arith_imm_sint8bit
+#define _vect_128_rshift_arith_imm_(_memb_kind) _vect_128_native_bin_oper(rshift_arith_imm, _memb_kind)
+
+
+#define vect_128_rshift_arith_scalr_flt64bit(_shift_a, m_scalr_b)    _mm_castsi128_pd(vect_128_rshift_arith_scalr_sint64bit(_shift_a, m_scalr_b))
+#define vect_128_rshift_arith_scalr_flt32bit(a, scalr_b)    _mm_castsi128_ps(vect_128_rshift_arith_scalr_sint32bit(a, scalr_b))
+#define vect_128_rshift_arith_scalr_sint64bit(_shift_a, _scalr_mag_b)   ({   \
+    typeof(_scalr_mag_b) shift_mag = (_scalr_mag_b);                \
+    vect_128_intgl_native_t                                         \
+        _rs_arth_va = vect_128_cast_to_intgl_native(_shift_a);      \
+    _mm_or_si128(                                                   \
+        _mm_srl_epi64(_rs_arth_va, _mm_set1_epi64x(shift_mag)),     \
+        _mm_sll_epi64(                                  \
+            _mm_cmplt_epi32(                            \
+                _mm_shuffle_epi32(                      \
+                    _rs_arth_va,                        \
+                    _MM_SHUFFLE(3, 3, 1, 1)             \
+               ),                                       \
+                _mm_setzero_si128()                     \
+            ),                                          \
+            _mm_set1_epi64x(64 - shift_mag)             \
+        )                                               \
+    );                                                  \
+})
+#define vect_128_rshift_arith_scalr_sint32bit(a, scalr_b)   _vect_128_arith_right_shift_scalr_native(32, a, scalr_b)
+#define vect_128_rshift_arith_scalr_sint16bit(a, scalr_b)   _vect_128_arith_right_shift_scalr_native(16, a, scalr_b)
+#define vect_128_rshift_arith_scalr_sint8bit(a, scalr_b)    ({      \
+    vect_128_intgl_native_t                                         \
+        v = vect_128_cast_to_intgl_native(a),                       \
+        shift_mag_v = _mm_set1_epi64x(scalr_b);                     \
+    _mm_or_si128(                                                   \
+        _mm_and_si128(                                              \
+            _mm_sra_epi16(v, shift_mag_v),                          \
+            _mm_set_epi8(                                           \
+                255, 0, 255, 0, 255, 0, 255, 0,                     \
+                255, 0, 255, 0, 255, 0, 255, 0                      \
+            )                                                       \
+        ),                                                          \
+        _mm_srli_epi16(                                             \
+            _mm_sra_epi16(_mm_slli_epi16(v, 8), shift_mag_v),       \
+            8                                                       \
+        )                                                           \
+    );                                                              \
+})
+#define vect_128_rshift_arith_scalr_uint64bit               vect_128_rshift_arith_scalr_sint64bit
+#define vect_128_rshift_arith_scalr_uint32bit               vect_128_rshift_arith_scalr_sint32bit
+#define vect_128_rshift_arith_scalr_uint16bit               vect_128_rshift_arith_scalr_sint16bit
+#define vect_128_rshift_arith_scalr_uint8bit                vect_128_rshift_arith_scalr_sint8bit
+#define _vect_128_rshift_arith_scalr_(_memb_kind) _vect_128_native_bin_oper(rshift_arith_scalr, _memb_kind)
+
+
+// Left Shift
+#define vect_128_lshift_scalr(a, _scalr_b, dest)    \
+    vect_128_bin_oper(lshift_scalr, vect_native(a), _scalr_b, dest)
+
+#define vect_128_lshift_imm(a, _imm, _dest)             \
+    vect_128_bin_oper(lshift_imm, vect_native(a), _imm, _dest)
+
+#undef  vect_128_lshift
+#define vect_128_lshift(a, b, dest)                     \
+    vect_128_bin_oper_select_scalr_imm_oper(lshift, vect_native(a), b, dest)
+
+// Logical Right Shift
+#define vect_128_rshift_logic_scalr(a, _scalr_b, dest)    \
+    vect_128_bin_oper(rshift_logic_scalr, vect_native(a), _scalr_b, dest)
+
+#define vect_128_rshift_logic_imm(a, _imm_b, dest)      \
+    vect_128_bin_oper(rshift_logic_imm, vect_native(a), _imm_b, dest)
+
+#undef vect_128_rshift_logic
+#define vect_128_rshift_logic(a, b, dest)               \
+    vect_128_bin_oper_select_scalr_imm_oper(rshift_logic, vect_native(a), b, dest)
+
+// Arithmetic Right Shift
+#define vect_128_rshift_arith_scalr(a, _scalr_b, dest)  \
+    vect_128_bin_oper(rshift_arith_scalr, vect_native(a), _scalr_b, dest)
+
+#define vect_128_rshift_arith_imm(a, _imm_b, dest)      \
+    vect_128_bin_oper(rshift_arith_imm, vect_native(a), _imm_b, dest)
+
+#undef vect_128_rshift_arith
+#define vect_128_rshift_arith(a, b, dest)               \
+    vect_128_bin_oper_select_scalr_imm_oper(rshift_arith, vect_native(a), b, dest)
 
 
 

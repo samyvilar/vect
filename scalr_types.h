@@ -239,7 +239,6 @@ typedef union { // union of all types, allowing us to interpret the bits from on
         comp_error_init("Unable to apply rshift_" #_type )                      \
     ))))
 
-
 #define _interp(e, _from_name, _to_name) (((union {_from_name _f; _to_name _t;}){(e)})._t)
 // arithmetic right shift (extending sign bit)
 
@@ -258,52 +257,102 @@ typedef union { // union of all types, allowing us to interpret the bits from on
 #define flt_rshift_logic(a, _byt_mag, shft_mag)    flt_rshift(a, _byt_mag, sint_byt_t, shft_mag)
 
 
-#define scalr_apply_intrs(intrs_name, _s, ...)
-
-#define scalr_bit_oper(a, oper, b)  \
-    macro_apply(                    \
-        scalr_switch,               \
-        (a),                        \
-        _interp(                    \
-            (_interp(a, flt_bit_t(64), uint_bit_t(64)) oper _interp(b, flt_bit_t(64), uint_bit_t(64))),     \
-            uint_bit_t(64),         \
-            flt_bit_t(64)           \
-        ),                          \
-        _interp(                    \
-            (_interp(a, flt_bit_t(32), uint_bit_t(32)) oper _interp(b, flt_bit_t(32), uint_bit_t(32))),     \
-            uint_bit_t(32),         \
-            flt_bit_t(32)           \
-        ),                          \
-        macro_comma_delim_8(((uint_bit_t(64))(a) oper (uint_bit_t(64))(b))),\
-        (void)0                     \
+// apply bit operations on scalar expression, if floats reinterpret bits as intgl scalars apply bit operation
+// and reinterpret result back as float type ...
+#define scalr_bit_oper(a, oper, b, _flt_to_intl_kind)       \
+    macro_apply(                                            \
+        scalr_switch,                                       \
+        (a),                                                \
+        _interp(                                            \
+            (_interp(a, flt_bit_t(64), _flt_to_intl_kind(64)) oper _interp(b, flt_bit_t(64), _flt_to_intl_kind(64))),     \
+            _flt_to_intl_kind(64),                          \
+            flt_bit_t(64)                                   \
+        ),                                                  \
+        _interp(                                            \
+            (_interp(a, flt_bit_t(32), _flt_to_intl_kind(32)) oper _interp(b, flt_bit_t(32), _flt_to_intl_kind(32))),     \
+            _flt_to_intl_kind(32),                          \
+            flt_bit_t(32)                                   \
+        ),                                                  \
+                                                            \
+        ((uint_bit_t(64))(a)    oper (uint_bit_t(64))(b)),  \
+        ((uint_bit_t(32))(a)    oper (uint_bit_t(32))(b)),  \
+        ((uint_bit_t(16))(a)    oper (uint_bit_t(16))(b)),  \
+        ((uint_bit_t(8))(a)     oper (uint_bit_t(8))(b)),   \
+                                                            \
+        ((sint_bit_t(64))(a)    oper (sint_bit_t(64))(b)),  \
+        ((sint_bit_t(32))(a)    oper (sint_bit_t(32))(b)),  \
+        ((sint_bit_t(16))(a)    oper (sint_bit_t(16))(b)),  \
+        ((sint_bit_t(8))(a)     oper (sint_bit_t(8))(b)),   \
+        (void)0                                             \
     )
 
-#define scalr_xor(a, b) scalr_bit_oper(a, ^, b)
-#define scalr_and(a, b) scalr_bit_oper(a, &, b)
-#define scalr_or(a, b)  scalr_bit_oper(a, |, b)
+#define scalr_xor(a, b) scalr_bit_oper(a, ^, b, uint_bit_t)
+#define scalr_and(a, b) scalr_bit_oper(a, &, b, uint_bit_t)
+#define scalr_or(a, b)  scalr_bit_oper(a, |, b, uint_bit_t)
+
+#define scalr_cmp_bits_eq(a, b)     scalr_bit_oper(a, ==, b, uint_bit_t)
+#define scalr_cmp_bits_neq(a, b)    scalr_bit_oper(a, !=, b, uint_bit_t)
+
+#define sclar_shift(a, shift_oper, b, _intgl_kind)                       \
+    macro_apply(                                                         \
+        scalr_switch,                                                    \
+        a,                                                               \
+        _interp(                                                         \
+            _interp(a, flt_bit_t(64), _intgl_kind(64)) shift_oper (b),   \
+            _intgl_kind(64),                                             \
+            flt_bit_t(64)                                                \
+        ),                                                               \
+        _interp(                                                         \
+            _interp(a, flt_bit_t(32), _intgl_kind(32)) shift_oper (b),   \
+            _intgl_kind(32),                                             \
+            flt_bit_t(32)                                                \
+        ),                                                               \
+        ((_intgl_kind(64))(a)    shift_oper (b)),          \
+        ((_intgl_kind(32))(a)    shift_oper (b)),          \
+        ((_intgl_kind(16))(a)    shift_oper (b)),          \
+        ((_intgl_kind(8))(a)     shift_oper (b)),          \
+        ((_intgl_kind(64))(a)    shift_oper (b)),          \
+        ((_intgl_kind(32))(a)    shift_oper (b)),          \
+        ((_intgl_kind(16))(a)    shift_oper (b)),          \
+        ((_intgl_kind(8))(a)     shift_oper (b)),          \
+        (void)0                                     \
+    )
+
+
+#define scalr_lshift(a, b)  sclar_shift(a, <<, b, uint_bit_t)
+#define scalr_lshift_imm    scalr_lshift
+#define scalr_lshift_scalr  scalr_lshift
+
+#define scalr_rshift_logic(a, b)  sclar_shift(a, >>, b, uint_bit_t)
+#define scalr_rshift_logic_imm    scalr_rshift_logic
+#define scalr_rshift_logic_scalr  scalr_rshift_logic
+
+#define scalr_rshift_arith(a, b)  sclar_shift(a, >>, b, sint_bit_t)
+#define scalr_rshift_arith_imm    scalr_rshift_arith
+#define scalr_rshift_arith_scalr  scalr_rshift_arith
 
 #define scalr_add(a, b) ((a) + (b))
 #define scalr_sub(a, b) ((a) - (b))
 #define scalr_mul(a, b) ((a) * (b))
 #define scalr_div(a, b) ((a) / (b))
 
-#define scalr_oper(_oper) scalr_ ## _oper
+
+
 
 // right shift bits, flts are interpreted as the corresponding intgl type, before the right shift,
 // ther result is interpreted back as the same flt type before returned
 // arithmetic right shift, extends the sign bit,
-#define scalr_rshift_arith(a, _mag) \
-    comp_select(expr_is_(a, flt, 32), flt_rshift_arith(a, 4, _mag),   \
-    comp_select(expr_is_(a, flt, 64), flt_rshift_arith(a, 8, _mag),   \
-    _rshift_(a, _mag, sint_byt_t)))
+//#define scalr_rshift_arith(a, _mag) \
+//    comp_select(expr_is_(a, flt, 32), flt_rshift_arith(a, 4, _mag),   \
+//    comp_select(expr_is_(a, flt, 64), flt_rshift_arith(a, 8, _mag),   \
+//    _rshift_(a, _mag, sint_byt_t)))
 
 // right shift bits logical (extend zeros) (supports all 10 scalar types, float types are interpret as uint bit logical rshift is applied
 // and then reinterpreted as floats and returned
-#define scalr_rshift_logic(a, _mag)                                       \
-    comp_select(expr_is_(a, flt, 32), flt_rshift_logic(a, 4, _mag),       \
-    comp_select(expr_is_(a, flt, 64), flt_rshift_logic(a, 8, _mag),       \
-    _rshift_(a, _mag, uint_byt_t)))
-
+//#define scalr_rshift_logic(a, _mag)                                       \
+//    comp_select(expr_is_(a, flt, 32), flt_rshift_logic(a, 4, _mag),       \
+//    comp_select(expr_is_(a, flt, 64), flt_rshift_logic(a, 8, _mag),       \
+//    _rshift_(a, _mag, uint_byt_t)))
 
 
 
@@ -432,19 +481,21 @@ typedef union { // union of all types, allowing us to interpret the bits from on
 #include <stdio.h>
 #define scalr_str(buffer, _expr) ({             \
     typeof(buffer[0]) *_temp = (buffer);        \
-    sprintf(                                    \
+    snprintf(                                   \
         _temp,                                  \
+        sizeof(buffer),                         \
         scalr_switch(                           \
             _expr,                              \
-            "%f", "%f", "%lli", "%i", "%hi", "%hhi", "%llu", "%u", "%hu", "%hhu",           \
+            "%f", "%f",                         \
+            "%lli", "%i", "%hi", "%hhi",        \
+            "%llu", "%u", "%hu", "%hhu",        \
             (void)0                             \
         ),                                      \
         (typeof(scalr_switch(_expr,             \
             (double)0, (double)0,               \
-            (signed long long int)0, (int)0, (short)0, (char)0, (unsigned long long int)0,  \
-            (unsigned int)0, (unsigned short)0, (unsigned char)0, \
-            (void)0))       \
-        )(_expr)            \
+            (signed long long int)0, (int)0, (short)0, (char)0,     \
+            (unsigned long long int)0, (unsigned)0, (unsigned short)0, (unsigned char)0,   \
+            (void)0)))(_expr)                   \
     ); _temp; })
 
 

@@ -9,9 +9,19 @@
 #define _add_symbl  +
 #define _sub_symbl  -
 #define _mul_symbl  *
+#define _lshift_symbl <<
+#define _rshift_symbl >>
+
+#define _lshift_imm_symbl   _lshift_symbl
+#define _lshift_scalr       _lshift_symbl
+
+#define _rshift_arith_symbl _rshift_symbl
+#define _rshift_logic_symbl _rshift_symbl
 
 #define oper_symbl(name) _ ## name ## _symbl
 #define token_str(_t) #_t
+
+#define scalr_oper(oper) scalr_ ## oper
 
 #define _test_vect_128_bin_oper(oper, _memb_type) ({                                                \
     _memb_type _a[16] = {macro_comma_delim_16(bits_rand(_memb_type))},                              \
@@ -55,7 +65,6 @@
     }                                                                                               \
 });
 
-
 #define _test_vect_128_xor(_memb_type)  _test_vect_128_bin_oper(xor, _memb_type)
 #define _test_vect_128_and(_memb_type)  _test_vect_128_bin_oper(and, _memb_type)
 #define _test_vect_128_or(_memb_type)   _test_vect_128_bin_oper(or,  _memb_type)
@@ -63,6 +72,61 @@
 #define _test_vect_128_sub(_memb_type)  _test_vect_128_bin_oper(sub, _memb_type)
 #define _test_vect_128_mul(_memb_type)  _test_vect_128_bin_oper(mul, _memb_type)
 
+
+// test
+#define _test_vect_128_opernd_b(oper, _memb_type, oper_b) ({                    \
+    _memb_type _a[16] = {macro_comma_delim_16(bits_rand(_memb_type))}, _res;    \
+        vect_128_t(_memb_type) _va, _vo;                                        \
+        _va = vect_128_load(_a, _va);                                           \
+        _vo = vect_128_ ## oper(_va, oper_b, _vo);                              \
+        int index;                                                              \
+        for (index = 0; index < vect_memb_cnt(_vo); index++)                    \
+            if (scalr_cmp_bits_neq((_res = scalr_oper(oper)(_a[index], oper_b)), vect_memb(_vo, index))) \
+                error_with_format(                                              \
+                    "failed to apply operator vect_128_%s(%s, %s)\n"            \
+                    "got: (%s %s %s) == (%s) =/= (%s)\n"                        \
+                    ,#oper, #_memb_type, #oper_b                                \
+                    ,scalr_str((char [512]){}, _a[index])                       \
+                    ,macro_apply(token_str, oper_symbl(oper))                   \
+                    ,scalr_str((char [512]){}, oper_b)                          \
+                    ,scalr_str((char [512]){}, _res)                            \
+                    ,scalr_str((char [512]){}, vect_memb(_vo, index))           \
+                );                                                              \
+    })
+
+#define _test_vect_128_lshift_imm(_memb_type)   _test_vect_128_opernd_b(lshift_imm, _memb_type, 5)
+#define _test_vect_128_lshift_scalr(_memb_type) ({                  \
+    int temp = rand() % bit_size(_memb_type);                       \
+    _test_vect_128_opernd_b(lshift_scalr, _memb_type, temp);        \
+})
+
+#define _test_vect_128_lshift(_memb_type) ({                        \
+    _test_vect_128_opernd_b(lshift, _memb_type, 4);                 \
+    int temp = rand() % bit_size(_memb_type);                       \
+    _test_vect_128_opernd_b(lshift, _memb_type, temp);              \
+})
+
+#define _test_vect_128_rshift_logic_imm(_memb_type)     _test_vect_128_opernd_b(rshift_logic_imm, _memb_type, 5)
+#define _test_vect_128_rshift_logic_scalr(_memb_type)   ({          \
+    int temp = rand() % bit_size(_memb_type);                       \
+    _test_vect_128_opernd_b(rshift_logic_scalr, _memb_type, temp);  \
+  })
+#define _test_vect_128_rshift_logic(_memb_type)   ({                \
+    _test_vect_128_opernd_b(rshift_logic, _memb_type, 4);           \
+    int temp = rand() % bit_size(_memb_type);                       \
+    _test_vect_128_opernd_b(rshift_logic, _memb_type, temp);        \
+ })
+
+#define _test_vect_128_rshift_arith_imm(_memb_type)     _test_vect_128_opernd_b(rshift_arith_imm, _memb_type, 5)
+#define _test_vect_128_rshift_arith_scalr(_memb_type)   ({          \
+    int temp = rand() % bit_size(_memb_type);                       \
+    _test_vect_128_opernd_b(rshift_arith_scalr, _memb_type, temp);  \
+ })
+#define _test_vect_128_rshift_arith(_memb_type) ({                  \
+    _test_vect_128_opernd_b(rshift_arith, _memb_type, 4);           \
+    int temp = rand() % bit_size(_memb_type);                       \
+    _test_vect_128_opernd_b(rshift_arith, _memb_type, temp);        \
+})
 
 #ifndef _test_type
     #error please specify the vector component type using -D_test_type=a_type_name
