@@ -293,28 +293,29 @@ typedef union { // union of all types, allowing us to interpret the bits from on
 #define scalr_cmp_bits_eq(a, b)     scalr_bit_oper(a, ==, b, uint_bit_t)
 #define scalr_cmp_bits_neq(a, b)    scalr_bit_oper(a, !=, b, uint_bit_t)
 
-#define sclar_shift(a, shift_oper, b, _intgl_kind)                       \
-    macro_apply(                                                         \
-        scalr_switch,                                                    \
-        a,                                                               \
-        _interp(                                                         \
-            _interp(a, flt_bit_t(64), _intgl_kind(64)) shift_oper (b),   \
-            _intgl_kind(64),                                             \
-            flt_bit_t(64)                                                \
-        ),                                                               \
-        _interp(                                                         \
-            _interp(a, flt_bit_t(32), _intgl_kind(32)) shift_oper (b),   \
-            _intgl_kind(32),                                             \
-            flt_bit_t(32)                                                \
-        ),                                                               \
-        ((_intgl_kind(64))(a)    shift_oper (b)),          \
-        ((_intgl_kind(32))(a)    shift_oper (b)),          \
-        ((_intgl_kind(16))(a)    shift_oper (b)),          \
-        ((_intgl_kind(8))(a)     shift_oper (b)),          \
-        ((_intgl_kind(64))(a)    shift_oper (b)),          \
-        ((_intgl_kind(32))(a)    shift_oper (b)),          \
-        ((_intgl_kind(16))(a)    shift_oper (b)),          \
-        ((_intgl_kind(8))(a)     shift_oper (b)),          \
+#define sclar_shift(shf_sclr_a, shift_oper, _mb, _intgl_kind)           \
+    macro_apply(                                                        \
+        scalr_switch,                                                   \
+        shf_sclr_a,                                                     \
+        _interp(                                                        \
+            (_interp(shf_sclr_a, flt_bit_t(64), _intgl_kind(64)) shift_oper (_mb)),   \
+            _intgl_kind(64),                                            \
+            flt_bit_t(64)                                               \
+        ),                                                              \
+        _interp(                                                        \
+            (_interp(shf_sclr_a, flt_bit_t(32), _intgl_kind(32)) shift_oper (_mb)),   \
+            _intgl_kind(32),                                            \
+            flt_bit_t(32)                                               \
+        ),                                                              \
+        ((_intgl_kind(64))(shf_sclr_a)    shift_oper (_mb)),            \
+        ((_intgl_kind(32))(shf_sclr_a)    shift_oper (_mb)),            \
+        ((_intgl_kind(16))(shf_sclr_a)    shift_oper (_mb)),            \
+        ((_intgl_kind(8))(shf_sclr_a)     shift_oper (_mb)),            \
+                                                                        \
+        ((_intgl_kind(64))(shf_sclr_a)    shift_oper (_mb)),            \
+        ((_intgl_kind(32))(shf_sclr_a)    shift_oper (_mb)),            \
+        ((_intgl_kind(16))(shf_sclr_a)    shift_oper (_mb)),            \
+        ((_intgl_kind(8))(shf_sclr_a)     shift_oper (_mb)),            \
         (void)0                                     \
     )
 
@@ -336,6 +337,21 @@ typedef union { // union of all types, allowing us to interpret the bits from on
 #define scalr_mul(a, b) ((a) * (b))
 #define scalr_div(a, b) ((a) / (b))
 
+#define scalr_sign_ext(a)                                       \
+    scalr_switch(                                               \
+        a,                                                      \
+        _interp((_interp(a, flt_bit_t(64), sint_bit_t(64)) >> 63),  sint_bit_t(64), flt_bit_t(64)),    \
+        _interp((_interp(a, flt_bit_t(32), sint_bit_t(32)) >> 31),  sint_bit_t(32), flt_bit_t(32)),    \
+        ((sint_bit_t(64))(a)  >> 63),       \
+        ((sint_bit_t(32))(a)  >> 31),       \
+        ((sint_bit_t(16))(a)  >> 15),       \
+        ((sint_bit_t(8))(a)   >> 7),        \
+        ((sint_bit_t(64))(a)  >> 63),       \
+        ((sint_bit_t(32))(a)  >> 31),       \
+        ((sint_bit_t(16))(a)  >> 15),       \
+        ((sint_bit_t(8))(a)   >>  7),       \
+        (void)0                             \
+    )
 
 
 
@@ -497,6 +513,28 @@ typedef union { // union of all types, allowing us to interpret the bits from on
             (unsigned long long int)0, (unsigned)0, (unsigned short)0, (unsigned char)0,   \
             (void)0)))(_expr)                   \
     ); _temp; })
+
+
+#define _xor_symbl  ^
+#define _or_symbl   |
+#define _and_symbl  &
+#define _add_symbl  +
+#define _sub_symbl  -
+#define _mul_symbl  *
+#define _lshift_symbl <<
+#define _rshift_symbl >>
+
+#define _lshift_imm_symbl   _lshift_symbl
+#define _lshift_scalr       _lshift_symbl
+
+#define _rshift_arith_symbl _rshift_symbl
+#define _rshift_logic_symbl _rshift_symbl
+
+#define oper_symbl(name) _ ## name ## _symbl
+#define token_str(_t) #_t
+
+#define scalr_oper(oper) scalr_ ## oper
+
 
 
 #endif

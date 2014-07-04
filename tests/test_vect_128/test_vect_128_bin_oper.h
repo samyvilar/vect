@@ -3,26 +3,6 @@
 
 #include "test_vect_128_common.h"
 
-#define _xor_symbl  ^
-#define _or_symbl   |
-#define _and_symbl  &
-#define _add_symbl  +
-#define _sub_symbl  -
-#define _mul_symbl  *
-#define _lshift_symbl <<
-#define _rshift_symbl >>
-
-#define _lshift_imm_symbl   _lshift_symbl
-#define _lshift_scalr       _lshift_symbl
-
-#define _rshift_arith_symbl _rshift_symbl
-#define _rshift_logic_symbl _rshift_symbl
-
-#define oper_symbl(name) _ ## name ## _symbl
-#define token_str(_t) #_t
-
-#define scalr_oper(oper) scalr_ ## oper
-
 #define _test_vect_128_bin_oper(oper, _memb_type) ({                                                \
     _memb_type _a[16] = {macro_comma_delim_16(bits_rand(_memb_type))},                              \
                _b[16] = {macro_comma_delim_16(bits_rand(_memb_type))}, _res;                        \

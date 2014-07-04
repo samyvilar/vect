@@ -316,6 +316,22 @@ MAP(vect_128_typedef, scalrs_names)
                                                                                                                                                                                                                                                                                                         
 /**  UNARY vector operators  *****************************************************************************/
 
+#define vect_128_unr_oper(oper, opernd, dest) ({        \
+    vect_128_set_native(                                \
+        dest,                                           \
+        macro_apply(                                    \
+            scalr_switch,                               \
+            vect_memb_t(dest),                          \
+            MAP_LIST_APPLY_ARG(                         \
+                _vect_128_ ## oper ## _,                \
+                opernd,                                 \
+                scalrs_names                            \
+            ),                                          \
+            (void)0                                     \
+         )                                              \
+   );  dest; })
+
+
 // broadcast expr into a vector type duplicating as many times as required ...
 #define vect_128_broad_cast_flt64bit    _mm_set1_pd
 #define vect_128_broad_cast_flt32bit    _mm_set1_ps
@@ -327,22 +343,10 @@ MAP(vect_128_typedef, scalrs_names)
 #define vect_128_broad_cast_uint16bit   vect_128_broad_cast_sint16bit
 #define vect_128_broad_cast_uint32bit   vect_128_broad_cast_sint32bit
 #define vect_128_broad_cast_uint64bit   vect_128_broad_cast_sint64bit
-
-
-
-#define vect_128_broad_cast_(_memb_name) vect_128_broad_cast_ ## _memb_name
-
-#define vect_128_map_intrs(expr)
+#define _vect_128_broad_cast_(_memb_name) vect_128_broad_cast_ ## _memb_name
 
 #undef vect_128_broad_cast
-#define vect_128_broad_cast(_v, expr) (                                                         \
-    vect_128_set_native(                                                                        \
-        _v,                                                                                     \
-        macro_apply(                                                                            \
-            scalr_switch,                                                                       \
-            expr, MAP_LIST_APPLY_ARG(vect_128_broad_cast_, expr, scalrs_names), ((void)0)       \
-        )), _v)
-
+#define vect_128_broad_cast(expr, dest) vect_128_unr_oper(broad_cast, expr, dest)
 
 /** BINARY operators *****************************************************************************/
 // apply binary operation ....
@@ -894,7 +898,7 @@ MAP(vect_128_typedef, scalrs_names)
 
 
 // Left Shift
-#define vect_128_lshift_scalr(a, _scalr_b, dest)    \
+#define vect_128_lshift_scalr(a, _scalr_b, dest)        \
     vect_128_bin_oper(lshift_scalr, vect_native(a), _scalr_b, dest)
 
 #define vect_128_lshift_imm(a, _imm, _dest)             \
@@ -905,7 +909,7 @@ MAP(vect_128_typedef, scalrs_names)
     vect_128_bin_oper_select_scalr_imm_oper(lshift, vect_native(a), b, dest)
 
 // Logical Right Shift
-#define vect_128_rshift_logic_scalr(a, _scalr_b, dest)    \
+#define vect_128_rshift_logic_scalr(a, _scalr_b, dest)  \
     vect_128_bin_oper(rshift_logic_scalr, vect_native(a), _scalr_b, dest)
 
 #define vect_128_rshift_logic_imm(a, _imm_b, dest)      \
@@ -927,7 +931,24 @@ MAP(vect_128_typedef, scalrs_names)
     vect_128_bin_oper_select_scalr_imm_oper(rshift_arith, vect_native(a), b, dest)
 
 
+/* Extends the sign bit result in either all zeros or all ones depending on most significant bit ...... */
+#define vect_128_sign_ext_flt64bit(a)   _mm_castsi128_pd(vect_128_sign_ext_sint64bit(a))
+#define vect_128_sign_ext_flt32bit(a)   _mm_castsi128_ps(vect_128_sign_ext_sint32bit(a))
 
+#define vect_128_sign_ext_sint64bit(a) _mm_srai_epi32(_mm_shuffle_epi32(vect_128_cast_to_intgl_native(a), _MM_SHUFFLE(3, 3, 1, 1)), 32)
+// ^^^^^^^^^^ copy the high 32 bits and right shift (2 cycles) ...
+#define vect_128_sign_ext_sint32bit(a)  vect_128_rshift_arith_imm_sint32bit(a, 32)
+#define vect_128_sign_ext_sint16bit(a)  vect_128_rshift_arith_imm_sint16bit(a, 16)
+#define vect_128_sign_ext_sint8bit(a)   _mm_cmplt_epi8(a, _mm_setzero_si128()) // 2 cycles ...
+
+#define vect_128_sign_ext_uint32bit  vect_128_sign_ext_sint32bit
+#define vect_128_sign_ext_uint64bit  vect_128_sign_ext_sint64bit
+#define vect_128_sign_ext_uint16bit  vect_128_sign_ext_sint16bit
+#define vect_128_sign_ext_uint8bit   vect_128_sign_ext_sint8bit
+#define _vect_128_sign_ext_(_memb_kind) vect_128_sign_ext_ ## _memb_kind
+
+#undef vect_128_sign_ext
+#define vect_128_sign_ext(a, dest) vect_128_unr_oper(sign_ext, vect_native(a), dest)
 
 
 // etract member from vectors ...
@@ -984,18 +1005,6 @@ _m; })
 
 
 
-#define vect_128_sign_ext_sint8bit(a)   _mm_cmplt_epi8(a, _mm_setzero_si128())
-#define vect_128_sign_ext_sint16bit(a)  _mm_cmplt_epi16(a, _mm_setzero_si128())
-#define vect_128_sign_ext_sint32bit(a)  _mm_cmplt_epi32(a, _mm_setzero_si128())
-#define vect_128_sign_ext_sint64bit(a)  _mm_cmplt_epi32(_mm_shuffle_epi32(a, _MM_SHUFFLE(3, 3, 1, 1)), _mm_setzero_si128())
-
-#define vect_128_sign_ext_uint8bit   vect_128_sign_ext_sint8bit
-#define vect_128_sign_ext_uint16bit  vect_128_sign_ext_sint16bit
-#define vect_128_sign_ext_uint32bit  vect_128_sign_ext_sint32bit
-#define vect_128_sign_ext_uint64bit  vect_128_sign_ext_sint64bit
-
-
-#define vector_elems_logc_rshft(v, i) _mm_srli_si128(v, sizeof(i))
 
 
 #endif // __SSE2__

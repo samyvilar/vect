@@ -11,9 +11,10 @@ test_typedef_native_sclar_types=double_t float_t sllint_t slint_t sint_t s_t int
 
 test_vect_comp_types=$(test_scalr_types) $(test_typedef_native_sclar_types)
 
+test_opers=decl broad_cast load set
+test_unr_opers=sign_ext
 test_bin_opers=xor and or add sub mul lshift_imm lshift_scalr lshift rshift_logic_imm rshift_logic_scalr rshift_logic rshift_arith_imm rshift_arith_scalr rshift_arith
 
-test_opers=decl broad_cast load set
 
 define test_vect_128_
 	@$(CC) $(CFLAGS) -D_test_oper=$(1) -D_test_type=$(2) test_vect_128_$(3).templ.c -o test_vect_128_$(1)_$(2).out
@@ -27,11 +28,17 @@ test_vect_128_$(1)_$(2):
 $(call test_vect_128_,$(1),$(2),$(3))
 endef
 
+
 $(foreach oper,$(test_bin_opers),$(foreach kind,$(test_vect_comp_types),$(eval $(call test_vect_128_templ_oper_kind,$(oper),$(kind),bin_oper))))
+
+
+$(foreach oper,$(test_unr_opers),$(foreach kind,$(test_vect_comp_types),$(eval $(call test_vect_128_templ_oper_kind,$(oper),$(kind),unr_oper))))
+
 
 $(foreach oper,$(test_opers),$(foreach kind,$(test_vect_comp_types),$(eval $(call test_vect_128_templ_oper_kind,$(oper),$(kind),$(oper)))))
 
-test: $(foreach oper,$(test_opers) $(test_bin_opers),$(foreach kind,$(test_vect_comp_types),test_vect_128_$(oper)_$(kind)))
+
+test: $(foreach oper,$(test_opers) $(test_unr_opers) $(test_bin_opers),$(foreach kind,$(test_vect_comp_types),test_vect_128_$(oper)_$(kind)))
 
 clean:
 	rm -f test_vect_128_*.out

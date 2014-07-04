@@ -5,7 +5,7 @@ int main() { // test broadcast ....
     #define _test_vect_128_broad_cast(_memb_type) ({        \
         vect_128_t(_memb_type) _v;                          \
         _memb_type _r = bits_rand(_memb_type);              \
-        _v = vect_128_broad_cast(_v, _r);                   \
+        _v = vect_128_broad_cast(_r, _v);                   \
         int index;                                          \
         for (index = 0; index < vect_memb_cnt(_v); index++) \
             if (_r != vect_memb(_v, index))                 \

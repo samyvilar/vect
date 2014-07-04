@@ -156,13 +156,13 @@ _oprn_a; })
 
 
 
-#define sign_bit_ext(a) rshift_arith(a, (bit_size(a) - 1))  // extends the sign bit creating a mask of ones or zeros..
+//#define sign_bit_ext(a) rshift_arith(a, (bit_size(a) - 1))  // extends the sign bit creating a mask of ones or zeros..
 // the following is faster on cpu with slow shifts, assuming little endian architecture ...
 #define sign_ext_by_mem(a) 	((typeof(a))(((union {long long val; struct {int low, high;};}){.val = (a)}).high))
 
 #define sign_bit_bool(a)  // rshift_logcl(a, (bit_size(a) - 1)) // returns 0 if sign bit is 0 or 1 if sign bits is 1 (so it just moves the sign from ms loc to ls loc ...) (((unsigned long long)(a) >> (bit_size(unsigned long long) - 1)) & 1LLU)
 
-#define sign_ext   sign_bit_ext
+//#define sign_ext   sign_bit_ext
 
 // min-max functions ...
 #define min_by_cmp(a, b)        (((a) < (b)) ? (a) : (b))
