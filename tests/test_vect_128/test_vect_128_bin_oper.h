@@ -75,6 +75,7 @@
 })
 
 #define _test_vect_128_lshift_imm(_memb_type)   _test_vect_128_opernd_b(lshift_imm, _memb_type, 5)
+
 #define _test_vect_128_lshift_scalr(_memb_type) ({                  \
     int temp = rand() % bit_size(_memb_type);                       \
     _test_vect_128_opernd_b(lshift_scalr, _memb_type, temp);        \

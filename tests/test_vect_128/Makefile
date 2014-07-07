@@ -11,7 +11,7 @@ test_typedef_native_sclar_types=double_t float_t sllint_t slint_t sint_t s_t int
 
 test_vect_comp_types=$(test_scalr_types) $(test_typedef_native_sclar_types)
 
-test_opers=decl broad_cast load set
+test_opers=decl broad_cast load store set
 test_unr_opers=sign_ext
 test_bin_opers=xor and or add sub mul lshift_imm lshift_scalr lshift rshift_logic_imm rshift_logic_scalr rshift_logic rshift_arith_imm rshift_arith_scalr rshift_arith
 

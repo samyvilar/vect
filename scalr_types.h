@@ -126,135 +126,9 @@
 #define expr_is_scalr(expr) type_is_scalr(typeof(expr))
 //      ^^^^^^^^^^^^^ returns 1 if expr returns a native scalar type, 0 otherwise
 
-// scalar type ids ...
-// prefix 0 for unsigned integral, 1 for sign int, 2 for float, with the second digit being their byte size ...
-// suffix is expected byte size ...
-#define uint1byt_id 1
-#define uint2byt_id 2
-#define uint4byt_id 4
-#define uint8byt_id 8
-
-#define sint1byt_id 11
-#define sint2byt_id 12
-#define sint4byt_id 14
-#define sint8byt_id 18
-
-#define flt4byt_id  24
-#define flt8byt_id  28
-
-#define flt_byt_id(_byt_siz)    flt ## _byt_siz ## byt_id
-#define uint_byt_id(_byt_siz)   uint ## _byt_siz ## byt_id
-#define sint_byt_id(_byt_siz)   sint ## _byt_siz ## byt_id
-// ^^^^^^^^^^ returns the corresponding type id contaiting _byt_size bytes
-
-#define uint8bit_id     uint1byt_id
-#define uint16bit_id    uint2byt_id
-#define uint32bit_id    uint4byt_id
-#define uint64bit_id    uint8byt_id
-
-#define sint8bit_id     sint1byt_id
-#define sint16bit_id    sint2byt_id
-#define sint32bit_id    sint4byt_id
-#define sint64bit_id    sint8byt_id
-
-#define flt32bit_id     flt4byt_id
-#define flt64bit_id     flt8byt_id
-
-#define flt_bit_id(_bit_siz) flt ## _bit_siz ## bit_id
-#define uint_bit_id(_bit_siz) uint ## _bit_siz ## bit_id
-#define sint_bit_id(_bit_siz) sint ## _bit_siz ## bit_id
-// ^^^^^^^^^^ returns the corresponding type id contaiting _bit_siz bits
-
-
-#define error_no_t_id(_byt_siz) ({ /*switch (_byt_siz) { }*/ assert_with_msg(0, "unable to determine type_id"); })
-
-#define INVALID_TYPE_ID -1
-
-#define flt_type_id_from_expr(expr)                                                 \
-    __builtin_choose_expr(expr_is_(expr, flt, 32), flt_bit_id(32),    \
-    __builtin_choose_expr(expr_is_(expr, flt, 64), flt_bit_id(64),    \
-        INVALID_TYPE_ID ))
-
-#define intgl_type_id_from_expr(expr, intgl_kind) \
-    __builtin_choose_expr(expr_is_(expr, intgl_kind, 8),  intgl_kind ## _bit_id(8),     \
-    __builtin_choose_expr(expr_is_(expr, intgl_kind, 16), intgl_kind ## _bit_id(16),    \
-    __builtin_choose_expr(expr_is_(expr, intgl_kind, 32), intgl_kind ## _bit_id(32),    \
-    __builtin_choose_expr(expr_is_(expr, intgl_kind, 64), intgl_kind ## _bit_id(64),    \
-        INVALID_TYPE_ID ))))
-
-#define uint_type_id_from_expr(expr) intgl_type_id_from_expr(expr, uint)
-#define sint_type_id_from_expr(expr) intgl_type_id_from_expr(expr, sint)
-
-#define type_id_from_expr(expr)                                             \
-    __builtin_choose_expr(expr_is_flt(expr), flt_type_id_from_expr(expr),   \
-    __builtin_choose_expr(expr_is_uint(expr), uint_type_id_from_expr(expr), \
-    __builtin_choose_expr(expr_is_sint(expr), sint_type_id_from_expr(expr), \
-    INVALID_TYPE_ID )))
-
-
-typedef union { // union of all types, allowing us to interpret the bits from one scalar type to any other scalar type ...
-    uint_byt_t(8) _max_type;
-
-    uint_byt_t(8) u_long;
-    sint_byt_t(8) s_long;
-
-    uint_byt_t(4) u_int;
-    sint_byt_t(4) s_int;
-
-    uint_byt_t(2) u_short;
-    sint_byt_t(2) s_short;
-
-    uint_byt_t(1) u_char;
-    sint_byt_t(1) s_char;
-
-    flt_byt_t(4) real_4;
-    flt_byt_t(8) real_8;
-
-    void *ptr;
-} types_t;
-
-#define types_init(_t, value) ({                                             \
-    if (is_real_type(value))                                                 \
-        switch (sizeof(value)) {                                             \
-            case 4: _t.real_4   = (typeof(_t.real_4))(value);   break ;      \
-            case 8: _t.real_8   = (typeof(_t.real_8))(value);   break ;      \
-        }                                                                    \
-    else                                                                     \
-        switch (sizeof(value)) {                     					     \
-            case 1: _t.u_char   = (typeof(_t.u_char))(value);   break ;  	 \
-            case 2: _t.u_short  = (typeof(_t.u_short))(value);  break ;      \
-            case 4: _t.u_int    = (typeof(_t.u_int))(value);    break ;      \
-            case 8: _t.u_long   = (typeof(_t.u_long))(value);   break ;      \
-        }                                                                    \
-})
-
-
-
-// right shift an intgl type or emit compilation error on ...
-#define _rshift_(a, _mag, _type)                                                \
-    __builtin_choose_expr(sizeof(a) == 1, ((_type(1))(a)) >> (_mag),            \
-    __builtin_choose_expr(sizeof(a) == 2, ((_type(2))(a)) >> (_mag),            \
-    __builtin_choose_expr(sizeof(a) == 4, ((_type(4))(a)) >> (_mag),            \
-    __builtin_choose_expr(sizeof(a) == 8, ((_type(8))(a)) >> (_mag),            \
-        comp_error_init("Unable to apply rshift_" #_type )                      \
-    ))))
 
 #define _interp(e, _from_name, _to_name) (((union {_from_name _f; _to_name _t;}){(e)})._t)
 // arithmetic right shift (extending sign bit)
-
-#define flt_rshift(a, _flt_byt_mag, _interp_as, _shft_mag)    \
-    _interp(             \
-        _rshift_(        \
-            _interp(a, flt_byt_t(_flt_byt_mag), _interp_as(_flt_byt_mag)), \
-            _shft_mag,                      \
-            _interp_as                      \
-        ),                                  \
-        _interp_as(_flt_byt_mag),           \
-        _flt_byt_mag(_flt_byt_mag)          \
-    )
-
-#define flt_rshift_arith(a, _byt_mag, shft_mag)    flt_rshift(a, _byt_mag, uint_byt_t, shft_mag)
-#define flt_rshift_logic(a, _byt_mag, shft_mag)    flt_rshift(a, _byt_mag, sint_byt_t, shft_mag)
 
 
 // apply bit operations on scalar expression, if floats reinterpret bits as intgl scalars apply bit operation
@@ -353,22 +227,6 @@ typedef union { // union of all types, allowing us to interpret the bits from on
         (void)0                             \
     )
 
-
-
-// right shift bits, flts are interpreted as the corresponding intgl type, before the right shift,
-// ther result is interpreted back as the same flt type before returned
-// arithmetic right shift, extends the sign bit,
-//#define scalr_rshift_arith(a, _mag) \
-//    comp_select(expr_is_(a, flt, 32), flt_rshift_arith(a, 4, _mag),   \
-//    comp_select(expr_is_(a, flt, 64), flt_rshift_arith(a, 8, _mag),   \
-//    _rshift_(a, _mag, sint_byt_t)))
-
-// right shift bits logical (extend zeros) (supports all 10 scalar types, float types are interpret as uint bit logical rshift is applied
-// and then reinterpreted as floats and returned
-//#define scalr_rshift_logic(a, _mag)                                       \
-//    comp_select(expr_is_(a, flt, 32), flt_rshift_logic(a, 4, _mag),       \
-//    comp_select(expr_is_(a, flt, 64), flt_rshift_logic(a, 8, _mag),       \
-//    _rshift_(a, _mag, uint_byt_t)))
 
 
 

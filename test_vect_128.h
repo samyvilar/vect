@@ -37,8 +37,8 @@ printf(                                         \
     ,macro_apply(stringify_token, _test_type)   \
 )
 
-#define run_test_vect_128(_name, func, args) ({ \
-    print_test_vect_128_name(_name, args);      \
+#define run_test_vect_128(_name, func, args...) ({ \
+    print_test_vect_128_name(_name, macro_arg_0(args));      \
     func(args);                                 \
     print_ok();                                 \
 })
