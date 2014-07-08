@@ -1,5 +1,4 @@
 
-
 #include "test_vect_128_common.h"
 
 #define error_if_memb_t_not(v, exp_t)                                       \
@@ -24,7 +23,7 @@ int main() { // test vect_128 declarations ....
             error("failed to handle vect_128_t non-scalar member type ...\n");})
 
     #define _test_vect_128_decl_default(_memb_type) ({                  \
-    if (!comp_types_eq(vect_128_t(union {}, _memb_type), _memb_type))   \
+    if (!comp_types_eq(vect_128_t(union {}, (_memb_type)0), _memb_type))   \
         error("failed to return default type while creating a non supported vect_128_t member type ...\n");\
     })
 

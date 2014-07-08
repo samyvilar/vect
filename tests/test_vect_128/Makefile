@@ -38,10 +38,29 @@ $(foreach oper,$(test_unr_opers),$(foreach kind,$(test_vect_comp_types),$(eval $
 $(foreach oper,$(test_opers),$(foreach kind,$(test_vect_comp_types),$(eval $(call test_vect_128_templ_oper_kind,$(oper),$(kind),$(oper)))))
 
 
-test: $(foreach oper,$(test_opers) $(test_unr_opers) $(test_bin_opers),$(foreach kind,$(test_vect_comp_types),test_vect_128_$(oper)_$(kind)))
+define test_vect_128_assembly
+test_vect_128_$(1)_$(2)_native:
+	@$(CC) $(CFLAGS) -S -D_test_oper=$(1)_native -D_test_type=$(2) test_vect_128_$(3)_native.templ.c -o test_vect_128_$(1)_$(2)_native.s
+	@$(CC) $(CFLAGS) -S -D_test_oper=$(1)_vect   -D_test_type=$(2) test_vect_128_$(3)_native.templ.c -o test_vect_128_$(1)_$(2)_vect.s
+	@diff test_vect_128_$(1)_$(2)_native.s test_vect_128_$(1)_$(2)_vect.s
+	@echo "test_vect_128_$$$$(tput setaf 10)$(1)_native$$$$(tput sgr0)($$$$(tput setaf 3)$(2)$$$$(tput sgr0)): $$$$(tput setaf 10)ok.$$$$(tput sgr0)"
+
+
+endef
+
+assembly_tests=broad_cast_unr broad_cast_bin
+$(foreach o,$(assembly_tests),\
+$(foreach t,$(test_vect_comp_types),\
+$(eval $(call test_vect_128_assembly,$(o),$(t),broad_cast))))
+
+test_vect_128_native: $(foreach oper,$(assembly_tests),$(foreach kind,$(test_vect_comp_types),test_vect_128_$(oper)_$(kind)_native))
+
+test: $(foreach oper,$(test_opers) $(test_unr_opers) $(test_bin_opers),\
+$(foreach kind,$(test_vect_comp_types),test_vect_128_$(oper)_$(kind))) $(test_vect_128_native)
 
 clean:
 	rm -f test_vect_128_*.out
+	rm -f test_vect_128_*.s
 
 
 
