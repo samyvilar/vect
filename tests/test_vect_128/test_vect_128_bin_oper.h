@@ -3,16 +3,18 @@
 
 #include "test_vect_128_common.h"
 
-#define _test_vect_128_bin_oper(oper, _memb_type) ({                                                \
+#define macro_packed_args(f, args) f args
+
+#define _test_vect_128_oper(oper, _memb_type, args...) ({                                           \
     _memb_type _a[16] = {macro_comma_delim_16(bits_rand(_memb_type))},                              \
                _b[16] = {macro_comma_delim_16(bits_rand(_memb_type))}, _res;                        \
    vect_128_t(_memb_type) _va, _vb, _vo, _vo_vect_sclr, _vo_sclr_vect, _vo_sclr_sclr;               \
     _va = vect_128_load(_a, _va);                                                                   \
     _vb = vect_128_load(_b, _vb);                                                                   \
-    _vo = vect_128_ ## oper(_va, _vb, _vo);                                                         \
-    _vo_vect_sclr = vect_128_ ## oper(_va, _b[0], _vo_vect_sclr);                                   \
-    _vo_sclr_vect = vect_128_ ## oper(_a[0], _vb, _vo_sclr_vect);                                   \
-    _vo_sclr_sclr = vect_128_ ## oper(_a[0], _b[0], _vo_sclr_sclr);                                 \
+    _vo           = macro_packed_args(vect_128_ ## oper, macro_arg_0(args)) /*(_va, _vb, _vo)*/;                                               \
+    _vo_vect_sclr = macro_packed_args(vect_128_ ## oper, macro_arg_1(args)) /*(_va, _b[0], _vo_vect_sclr)*/;                                   \
+    _vo_sclr_vect = macro_packed_args(vect_128_ ## oper, macro_arg_2(args)) /*(_a[0], _vb, _vo_sclr_vect)*/;                                   \
+    _vo_sclr_sclr = macro_packed_args(vect_128_ ## oper, macro_arg_3(args)) /*(_a[0], _b[0], _vo_sclr_sclr)*/;                                 \
     int index;                                                                                      \
     for (index = 0; index < vect_memb_cnt(_vo); index++)                                            \
         if ((_res = (scalr_oper(oper)(_a[index], _b[index]))) != vect_memb(_vo, index))             \
@@ -43,15 +45,43 @@
                 ,#oper, #_memb_type                                                                 \
             );                                                                                      \
     }                                                                                               \
-});
+})
 
-#define _test_vect_128_xor(_memb_type)  _test_vect_128_bin_oper(xor, _memb_type)
-#define _test_vect_128_and(_memb_type)  _test_vect_128_bin_oper(and, _memb_type)
-#define _test_vect_128_or(_memb_type)   _test_vect_128_bin_oper(or,  _memb_type)
-#define _test_vect_128_add(_memb_type)  _test_vect_128_bin_oper(add, _memb_type)
-#define _test_vect_128_sub(_memb_type)  _test_vect_128_bin_oper(sub, _memb_type)
-#define _test_vect_128_mul(_memb_type)  _test_vect_128_bin_oper(mul, _memb_type)
 
+#define tnr_opers_0     (_single_eval(_va, 0), _single_eval(_vb, 1), _vo)
+#define tnr_opers_1     (_single_eval(_va, 2), _single_eval(_b[0], 3), _vo_vect_sclr)
+#define tnr_opers_2     (_single_eval(_a[0], 4), _single_eval(_vb, 5), _vo_sclr_vect)
+#define tnr_opers_3     (_single_eval(_a[0], 6), _single_eval(_b[0], 7), _vo_sclr_sclr)
+#define tnr_opers   tnr_opers_0, tnr_opers_1, tnr_opers_2, tnr_opers_3
+
+#define bin_opers_0     (_single_eval(_va, 0), _single_eval(_vb, 1))
+#define bin_opers_1     (_single_eval(_va, 2), _single_eval(_b[0], 3))
+#define bin_opers_2     (_single_eval(_a[0], 4), _single_eval(_vb, 5))
+#define bin_opers_3     (_single_eval(_a[0], 6), _single_eval(_b[0], 7))
+#define bin_opers   bin_opers_0, bin_opers_1, bin_opers_2, bin_opers_3
+
+
+#define _test_vect_128_xor_tnr(_memb_type)  _test_vect_128_oper(xor, _memb_type, tnr_opers)
+#define _test_vect_128_and_tnr(_memb_type)  _test_vect_128_oper(and, _memb_type, tnr_opers)
+#define _test_vect_128_or_tnr(_memb_type)   _test_vect_128_oper(or,  _memb_type, tnr_opers)
+#define _test_vect_128_add_tnr(_memb_type)  _test_vect_128_oper(add, _memb_type, tnr_opers)
+#define _test_vect_128_sub_tnr(_memb_type)  _test_vect_128_oper(sub, _memb_type, tnr_opers)
+#define _test_vect_128_mul_tnr(_memb_type)  _test_vect_128_oper(mul, _memb_type, tnr_opers)
+
+#define _test_vect_128_xor_bin(_memb_type)  _test_vect_128_oper(xor, _memb_type, bin_opers)
+#define _test_vect_128_and_bin(_memb_type)  _test_vect_128_oper(and, _memb_type, bin_opers)
+#define _test_vect_128_or_bin(_memb_type)   _test_vect_128_oper(or,  _memb_type, bin_opers)
+#define _test_vect_128_add_bin(_memb_type)  _test_vect_128_oper(add, _memb_type, bin_opers)
+#define _test_vect_128_sub_bin(_memb_type)  _test_vect_128_oper(sub, _memb_type, bin_opers)
+#define _test_vect_128_mul_bin(_memb_type)  _test_vect_128_oper(mul, _memb_type, bin_opers)
+
+
+//#define _test_vect_128_xor  _test_vect_128_xor_tnr
+//#define _test_vect_128_and  _test_vect_128_and_tnr
+//#define _test_vect_128_or   _test_vect_128_or_tnr
+//#define _test_vect_128_add  _test_vect_128_add_tnr
+//#define _test_vect_128_sub  _test_vect_128_sub_tnr
+//#define _test_vect_128_mul  _test_vect_128_mul_tnr
 
 // test
 #define _test_vect_128_opernd_b(oper, _memb_type, oper_b) ({                    \

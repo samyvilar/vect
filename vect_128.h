@@ -215,13 +215,20 @@
      )
 #endif
 
-
 #define vect_128_unr_or_bin(oper_name, args...) \
     macro_arg_2(                        \
         args,                           \
         vect_128_ ## oper_name ## _bin, \
         vect_128_ ## oper_name ## _unr  \
     )(args)
+
+#define vect_128_bin_or_tnr(oper_name, args...) \
+    macro_arg_3(                                \
+        args,                                   \
+        vect_128_ ## oper_name ## _tnr,         \
+        vect_128_ ## oper_name ## _bin          \
+    )(args)
+
 
 #define vect_128_unr_oper(oper, opernd, dest)           \
     vect_128_set_native(                                \
@@ -234,6 +241,45 @@
         dest,                                           \
         vect_128_apply_oper(oper, vect_memb_t(dest), oper_a, oper_b)   \
    )
+
+
+
+#define expr_from_possbl_vect(expr, _type)                      \
+    comp_select(                                                \
+        comp_types_eq(typeof(expr), _type),                     \
+        (expr),                                                 \
+        ((((union {_type _val; typeof(expr) _e;})(expr)))._val) \
+    )
+
+/*((((union {_type _val; typeof(expr) _e;})(expr)))._val)*/
+// broadcast scalar to native vect_128 if _opern is an expr with a scalr otherwise try to return the native vector
+#define vect_128_broad_cast_to_native_if_scalr(_opern, _vect)                       \
+    scalr_switch(                                                                   \
+        _opern,                                                                     \
+        _mm_set1_pd(expr_from_possbl_vect(_opern,       double)),                   \
+        _mm_set1_ps(expr_from_possbl_vect(_opern,       float)),                    \
+        _mm_set1_epi64x(expr_from_possbl_vect(_opern,   long long)),                \
+        _mm_set1_epi32(expr_from_possbl_vect(_opern,    int)),                      \
+        _mm_set1_epi16(expr_from_possbl_vect(_opern,    short)),                    \
+        _mm_set1_epi8(expr_from_possbl_vect(_opern,     char)),                     \
+        _mm_set1_epi64x(expr_from_possbl_vect(_opern,   unsigned long long)),       \
+        _mm_set1_epi32(expr_from_possbl_vect(_opern,    unsigned int)),             \
+        _mm_set1_epi16(expr_from_possbl_vect(_opern,    unsigned short)),           \
+        _mm_set1_epi8(expr_from_possbl_vect(_opern,     unsigned char)),            \
+        vect_native(expr_from_possbl_vect(_opern,       typeof(_vect)))             \
+    )
+
+#define is_vect_128_expr(expr) (                                 \
+        comp_types_eq(typeof(expr), vect_128_flt64bit_t)         \
+    ||  comp_types_eq(typeof(expr), vect_128_flt32bit_t)         \
+    ||  comp_types_eq(typeof(expr), vect_128_sint64bit_t)        \
+    ||  comp_types_eq(typeof(expr), vect_128_sint32bit_t)        \
+    ||  comp_types_eq(typeof(expr), vect_128_sint16bit_t)        \
+    ||  comp_types_eq(typeof(expr), vect_128_sint8bit_t)         \
+    ||  comp_types_eq(typeof(expr), vect_128_uint64bit_t)        \
+    ||  comp_types_eq(typeof(expr), vect_128_uint32bit_t)        \
+    ||  comp_types_eq(typeof(expr), vect_128_uint16bit_t)        \
+    ||  comp_types_eq(typeof(expr), vect_128_uint8bit_t) )       \
 
 
 #define vect_128_cast_to_flt32bit_native(expr)  ((vect_128_flt32bit_native_t)(expr))
@@ -343,20 +389,6 @@
         vect_128_apply_oper(_kind, vect_memb_t(_v), _p)\
     )                                       \
 
-#define is_vect_128_expr(expr) (                                 \
-        comp_types_eq(typeof(expr), vect_128_flt64bit_t)         \
-    ||  comp_types_eq(typeof(expr), vect_128_flt32bit_t)         \
-    ||  comp_types_eq(typeof(expr), vect_128_sint64bit_t)        \
-    ||  comp_types_eq(typeof(expr), vect_128_sint32bit_t)        \
-    ||  comp_types_eq(typeof(expr), vect_128_sint16bit_t)        \
-    ||  comp_types_eq(typeof(expr), vect_128_sint8bit_t)         \
-    ||  comp_types_eq(typeof(expr), vect_128_uint64bit_t)        \
-    ||  comp_types_eq(typeof(expr), vect_128_uint32bit_t)        \
-    ||  comp_types_eq(typeof(expr), vect_128_uint16bit_t)        \
-    ||  comp_types_eq(typeof(expr), vect_128_uint8bit_t) )        \
-
-// TODO: figure out a cleaner and faster solution ...
-
 
 #define vect_128_load_unr_(_kind, _p) \
     ((typeof(comp_select(is_vect_128_expr((_p)[0]), (_p)[0], (vect_128_t((_p)[0], (typeof((_p)[0])){0})){0})))\
@@ -428,11 +460,6 @@
 #define _vect_128_broad_cast_(_memb_name) vect_128_broad_cast_ ## _memb_name
 
 
-#define expr_from_possbl_vect(expr, _type)                  \
-    comp_select(comp_types_eq(typeof(expr), _type), expr,   \
-    ((((union {_type _val; typeof(expr) _e;})(expr)))._val))
-
-
 #undef vect_128_broad_cast
 #define vect_128_broad_cast_unr(expr) \
     ((vect_128_t(expr))(vect_128_apply_oper(broad_cast, expr, expr)))
@@ -444,35 +471,6 @@
 
 
 /** BINARY operators *****************************************************************************/
-/*((((union {_type _val; typeof(expr) _e;})(expr)))._val)*/
-
-    // broadcast scalar if _opern is an expr with a scalr eitherwise try to return the native vector
-#define vect_128_broad_cast_if_scalr(_opern, _vect)                     \
-    scalr_switch(                                                       \
-        _opern,                                                         \
-        _mm_set1_pd(expr_from_possbl_vect(_opern,       double)),       \
-        _mm_set1_ps(expr_from_possbl_vect(_opern,       float)),        \
-        _mm_set1_epi64x(expr_from_possbl_vect(_opern,   long long)),    \
-        _mm_set1_epi32(expr_from_possbl_vect(_opern,    int)),          \
-        _mm_set1_epi16(expr_from_possbl_vect(_opern,    short)),        \
-        _mm_set1_epi8(expr_from_possbl_vect(_opern,     char)),         \
-        _mm_set1_epi64x(expr_from_possbl_vect(_opern,   long long)),    \
-        _mm_set1_epi32(expr_from_possbl_vect(_opern,    int)),          \
-        _mm_set1_epi16(expr_from_possbl_vect(_opern,    short)),        \
-        _mm_set1_epi8(expr_from_possbl_vect(_opern,     char)),         \
-        vect_native(expr_from_possbl_vect(_opern,      typeof(_vect)))       \
-    )
-
-// if either or both operands is a scalar then they will be broadcasted based on the dest vector
-// before the operation is applied ...
-#define vect_128_bin_oper_broad_casted_scalrs(oper, oper_a, oper_b, dest) \
-    vect_128_bin_oper(                                  \
-        oper,                                           \
-        vect_128_broad_cast_if_scalr(oper_a, dest),     \
-        vect_128_broad_cast_if_scalr(oper_b, dest),     \
-        dest                                            \
-    )
-
 #define vect_128_bin_cast_to_(_cast_a, _cast_b, cast_to) \
     (vect_128_cast_to_ ## cast_to ## _native(_cast_a), vect_128_cast_to_ ## cast_to ## _native(_cast_b))
 
@@ -706,28 +704,28 @@
 
     about 13 cycles
  */
-#define vect_128_mul_sse2_sint8bit(_a, _b) ({           \
-    const vect_128_intgl_native_t                       \
-        _va_mul_8bit_sse2 = vect_128_cast_to_intgl_native(_a),         \
-        _vb_mul_8bit_sse2 = vect_128_cast_to_intgl_native(_b),         \
-        even_entrs = _mm_set_epi8(                                 \
-            0, 0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF,         \
-            0, 0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF          \
-        );                                              \
-    _mm_or_si128(                                       \
-        _mm_slli_epi16(                                 \
-            _mm_mullo_epi16(                            \
-                _mm_srli_epi16(_va_mul_8bit_sse2, 8),   \
-                _mm_srli_epi16(_vb_mul_8bit_sse2, 8)    \
-            ),                                          \
-        8),                                             \
-        _mm_and_si128(                                  \
-            _mm_mullo_epi16(                            \
-                _mm_and_si128(_va_mul_8bit_sse2, even_entrs),          \
-                _mm_and_si128(_vb_mul_8bit_sse2, even_entrs)           \
-            ),                                          \
-            even_entrs                                  \
-        )                                               \
+#define vect_128_mul_sse2_sint8bit(_a, _b) ({                   \
+    const vect_128_intgl_native_t                               \
+        _va_mul_8bit_sse2 = vect_128_cast_to_intgl_native(_a),  \
+        _vb_mul_8bit_sse2 = vect_128_cast_to_intgl_native(_b),  \
+        even_entrs = _mm_set_epi8(                              \
+            0, 0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF,                 \
+            0, 0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF                  \
+        );                                                      \
+    _mm_or_si128(                                               \
+        _mm_slli_epi16(                                         \
+            _mm_mullo_epi16(                                    \
+                _mm_srli_epi16(_va_mul_8bit_sse2, 8),           \
+                _mm_srli_epi16(_vb_mul_8bit_sse2, 8)            \
+            ),                                                  \
+        8),                                                     \
+        _mm_and_si128(                                          \
+            _mm_mullo_epi16(                                    \
+                _mm_and_si128(_va_mul_8bit_sse2, even_entrs),   \
+                _mm_and_si128(_vb_mul_8bit_sse2, even_entrs)    \
+            ),                                                  \
+            even_entrs                                          \
+        )                                                       \
     ); })
 
 // mul_ssse3_sint8bit seems slightly slower ...
@@ -743,28 +741,69 @@
 
 
 #define vect_128_apply_bin(oper_name, a, b)     \
-    vect_128_apply_oper(oper_name, vect_memb_t(a), vect_native(a), vect_native(b))
+    vect_128_apply_oper(oper_name, vect_memb_t(a), vect_native(a), vect_native(b))   
+
+
+// if either or both operands is a scalar then they will be broadcasted based on the dest vector
+// before the operation is applied ...
+#define vect_128_tnr_oper_broad_casted_scalrs(oper, oper_a, oper_b, dest) \
+    vect_128_bin_oper(                                          \
+        oper,                                                   \
+        vect_128_broad_cast_to_native_if_scalr(oper_a, dest),   \
+        vect_128_broad_cast_to_native_if_scalr(oper_b, dest),   \
+        dest                                                    \
+    )
+
+
+#define vect_128_broad_cast_if_scalr_or_vect_128(_sclar_or_vect_128)            \
+    (                                                                           \
+        (vect_128_t(_sclar_or_vect_128, (typeof(_sclar_or_vect_128)){0}))       \
+        vect_128_broad_cast_to_native_if_scalr(                                 \
+            _sclar_or_vect_128,                                                 \
+            (vect_128_t(_sclar_or_vect_128, (typeof(_sclar_or_vect_128)){0})){} \
+        )                                                                       \
+    )
+
+#define macro_remove_type_cast(expr) macro_repeat_0 macro_cons_parens expr
+// @@TODO: clean up this MESS!!!!
+#define vect_128_bin_broad_cast_scalrs(oper, oper_a, oper_b)                            \
+    ((typeof(vect_128_broad_cast_if_scalr_or_vect_128(oper_a)))(vect_128_apply_oper(     \
+        oper,                                                                           \
+        vect_memb_t(vect_128_broad_cast_if_scalr_or_vect_128(oper_a)),                  \
+        vect_native(vect_128_broad_cast_if_scalr_or_vect_128(oper_a)),                  \
+        vect_native(vect_128_broad_cast_if_scalr_or_vect_128(oper_b)))))
+
+
 
 #undef vect_128_and
-#define vect_128_and(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(and, a, b, out)
-#define vect_128_and_bin(a, b)  vect_128_apply_bin(add, a, b)
+#define vect_128_and_bin(args...)   vect_128_bin_broad_cast_scalrs(and, args)
+#define vect_128_and_tnr(args...)   vect_128_tnr_oper_broad_casted_scalrs(and, args)
+#define vect_128_and(args...)       vect_128_bin_or_tnr(and, args)
 
 #undef vect_128_or
-#define vect_128_or(a, b, out)   vect_128_bin_oper_broad_casted_scalrs(or, a, b, out)
-#define vect_128_or_bin(a, b)  vect_128_apply_bin(or, a, b)
+#define vect_128_or_bin(args...)    vect_128_bin_broad_cast_scalrs(or, args)
+#define vect_128_or_tnr(args...)    vect_128_tnr_oper_broad_casted_scalrs(or, args)
+#define vect_128_or(args...)        vect_128_bin_or_tnr(or, args)
 
 #undef vect_128_xor
-#define vect_128_xor(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(xor, a, b, out)
-#define vect_128_xor_bin(a, b)  vect_128_apply_bin(xor, a, b)
+#define vect_128_xor_bin(args...)   vect_128_bin_broad_cast_scalrs(xor, args)
+#define vect_128_xor_tnr(args...)   vect_128_tnr_oper_broad_casted_scalrs(xor, args)
+#define vect_128_xor(args...)       vect_128_bin_or_tnr(xor, args)
 
 #undef vect_128_add
-#define vect_128_add(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(add, a, b, out)
-#define vect_128_add_bin(a, b)   vect_128_apply_bin(add, a, b)
+#define vect_128_add_bin(args...)   vect_128_bin_broad_cast_scalrs(add, args)
+#define vect_128_add_tnr(args...)   vect_128_tnr_oper_broad_casted_scalrs(add, args)
+#define vect_128_add(args...)       vect_128_bin_or_tnr(add, args)
 
 #undef vect_128_sub
-#define vect_128_sub(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(sub, a, b, out)
+#define vect_128_sub_bin(args...)   vect_128_bin_broad_cast_scalrs(sub, args)
+#define vect_128_sub_tnr(args...)   vect_128_tnr_oper_broad_casted_scalrs(sub, args)
+#define vect_128_sub(args...)       vect_128_bin_or_tnr(sub, args)
+
 #undef vect_128_mul
-#define vect_128_mul(a, b, out)  vect_128_bin_oper_broad_casted_scalrs(mul, a, b, out)
+#define vect_128_mul_bin(args...)   vect_128_bin_broad_cast_scalrs(mul, args)
+#define vect_128_mul_tnr(args...)   vect_128_tnr_oper_broad_casted_scalrs(mul, args)
+#define vect_128_mul(args...)       vect_128_bin_or_tnr(mul, args)
 
 
 /**************************************************************************************************/

@@ -1,6 +1,6 @@
 
 CC=gcc
-CFLAGS=-Wfatal-errors
+CFLAGS=-Wfatal-errors -fmacro-backtrace-limit=0
 
 test_flt_types=float double
 test_scalr_sint_types=signed_long_long_int signed_long_int signed_int int signed_short_int short_int short signed_char char
@@ -13,7 +13,11 @@ test_vect_comp_types=$(test_scalr_types) $(test_typedef_native_sclar_types)
 
 test_opers=decl broad_cast load store set
 test_unr_opers=sign_ext
-test_bin_opers=xor and or add sub mul lshift_imm lshift_scalr lshift rshift_logic_imm rshift_logic_scalr rshift_logic rshift_arith_imm rshift_arith_scalr rshift_arith
+test_bin_opers=xor_bin xor_tnr and_bin and_tnr or_bin or_tnr add_bin add_tnr sub_bin sub_tnr mul_bin mul_tnr lshift_imm lshift_scalr lshift rshift_logic_imm rshift_logic_scalr rshift_logic rshift_arith_imm rshift_arith_scalr rshift_arith
+#test_bin_opers=$(foreach o,$(opers),$(o)_bin)
+#test_tnr_opers=$(foreach o,$(opers),$(o)_tnr)
+#test_opers=$(test_bin_opers) $(test_tnr_opers)
+
 
 
 define test_vect_128_

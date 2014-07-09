@@ -97,19 +97,16 @@ typedef unsigned char           uchar_t;
 
 #define test_vect_128_oper(_name) _test_vect_128_ ## _name
 
+static char _called[200] = {0};
 
-#define _check_side_effects_name(_test_name, _test_type)  _test_side_effects ## _ ## _test_name ## _ ## _test_type
-
-// make sure that an expression is only called onced!
-#define _check_side_effects(_test_name, _test_type) \
-_test_type _test_side_effects ## _ ## _test_name ## _ ## _test_type (_test_type _rand_value) {  \
-    static int _not_called = 1;         \
-    if (_not_called) {                  \
-        _not_called = 0;                \
-        return _rand_value;             \
-    }                                   \
-    error_with_format("%s(%s): Error expression evaluted more than once!", #_test_name, #_test_type);      \
-}                                                               \
+// TODO: clang bug!!!
+#define _single_eval(expr, _id) \
+    ((typeof(expr))( ((_called[_id])) ? (exit(-1), (expr)) : ((_called[_id] = 1), (expr) )))
+//({      \
+//    if (_called[_id])                   \
+//        error("Error expression evaluted more than once!"); \
+//    _called[_id] = 1;                   \
+//    (expr); })
 
 
 #define _test_vect_128_assembly(_test_type, _test_kind)  _test_vect_128_ ## _test_kind (_test_type)

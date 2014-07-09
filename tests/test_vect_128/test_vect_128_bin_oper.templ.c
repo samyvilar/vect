@@ -9,6 +9,7 @@
 #endif
 
 int main() {
+
     run_test_vect_128(_test_oper, macro_apply(test_vect_128_oper, _test_oper), _test_type);
 
     return 0;

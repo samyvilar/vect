@@ -16,27 +16,24 @@
             );                                          \
 })
 
-_check_side_effects(broad_cast_bin, _test_type)
 #define  _test_vect_128_broad_cast_bin(_memb_type) \
     _test_vect_128_broad_cast_( \
         _memb_type,             \
-        (_check_side_effects_name(broad_cast_bin, _test_type)(_r), _v), \
+        (_single_eval(_r, 0), _v), \
         __temp                  \
     )
 
-_check_side_effects(broad_cast_bin_assign, _test_type)
 #define  _test_vect_128_broad_cast_bin_assign(_memb_type) \
     _test_vect_128_broad_cast_(     \
         _memb_type,                 \
-        (_check_side_effects_name(broad_cast_bin_assign, _test_type)(_r), _v),\
+        (_single_eval(_r, 1), _v),\
         _v                         \
     )
 
-_check_side_effects(broad_cast_unr, _test_type)
 #define _test_vect_128_broad_cast_unr(_memb_type)       \
     _test_vect_128_broad_cast_(                         \
         _memb_type,                                     \
-        (_check_side_effects_name(broad_cast_unr, _test_type)(_r)),  \
+        (_single_eval(_r, 2)),  \
         _v                                              \
     )
 

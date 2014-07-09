@@ -108,6 +108,7 @@
 #define macro_arg_0(arg_0, args...) arg_0
 #define macro_arg_1(arg_0, arg_1, ...) arg_1
 #define macro_arg_2(arg_0, arg_1, arg_2, ...) arg_2
+#define macro_arg_3(arg_0, arg_1, arg_2, arg_3, ...) arg_3
 
 #define MACRO_NEW_LINE "\n\n"
 
