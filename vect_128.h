@@ -333,15 +333,8 @@
 
 
 // Store 128 bits to either aligned or unaligned address
-#define vect_128_store_(_kind, _p, _v)  ({  \
-    vect_128_apply_oper(                    \
-        _kind,                              \
-        vect_memb_t(_v),                    \
-        _p,                                 \
-        vect_native(_v)                     \
-    );                                      \
-    _v;                                     \
-})
+#define vect_128_store_(_kind, _p, _v)  ({vect_128_apply_oper(_kind, vect_memb_t(_v), _p, vect_native(_v)); _v;})
+
 
 #undef  vect_128_store_align
 #define vect_128_store_align(_p, _v) vect_128_store_(store_align, _p, _v)
@@ -384,22 +377,13 @@
 #define _vect_128_load_(_memb_kind)   _vect_128_native_oper(load, _memb_kind)
 
 #define vect_128_load_bin_(_kind, _p, _v)   \
-    vect_128_set_native(                    \
-        _v,                                 \
-        vect_128_apply_oper(_kind, vect_memb_t(_v), _p)\
-    )                                       \
+    vect_128_set_native(_v, vect_128_apply_oper(_kind, vect_memb_t(_v), _p))
 
-
-#define vect_128_load_unr_(_kind, _p) \
-    ((typeof(comp_select(is_vect_128_expr((_p)[0]), (_p)[0], (vect_128_t((_p)[0], (typeof((_p)[0])){0})){0})))\
-        vect_128_apply_oper(    \
-            _kind,              \
-            vect_memb_t(comp_select(is_vect_128_expr((_p)[0]), (_p)[0], (vect_128_t((_p)[0], (typeof((_p)[0])){0})){0})),\
-            _p))
-//    comp_select(                        \
-//        bit_size(_p[0]) == 128,         \
-//        vect_128_apply_oper(_kind, expr_from_possbl_vect(_p, vect_128_t(_p[0])), _p),\
-//        vect_128_apply_oper(_kind, _p[0], _p))
+// @@TODO: CLEAN UP!!!!
+#define vect_128_load_unr_(_kind, _p) ({    \
+    static const typeof(comp_select(is_vect_128_expr((_p)[0]), (_p)[0], (vect_128_t((_p)[0], (typeof((_p)[0])){0})){0})) _t;\
+        (typeof(_t))vect_128_apply_oper(_kind, vect_memb_t(_t), _p);    \
+    })
 
 #undef vect_128_load_align
 #undef vect_128_load
@@ -439,10 +423,7 @@
 /*      ^^^^^^^^^^^^ set the components of an internal vect _v(vect_128_*_t
  *               where exprs is a comma seperated list of exprs starting from the most
  *               most significant to least */                                       \
-    vect_128_set_native(                                                            \
-        _v,                                                                         \
-        vect_128_apply_oper(set, vect_memb_t(_v), exprs, macro_comma_delim_16(0))   \
-    )
+    vect_128_set_native(_v, vect_128_apply_oper(set, vect_memb_t(_v), exprs, macro_comma_delim_16(0)))
 
                                                                                                                                                                                                                                                                                                         
 /**  UNARY vector operators  *****************************************************************************/
@@ -586,11 +567,17 @@
                 _mm_add_epi64(                          \
                     _mm_mul_epu32(                      \
                         _low_b,                         \
-                        _mm_shuffle_epi32(_low_a, _MM_SHUFFLE(2, 3, 0, 1))\
+                        _mm_shuffle_epi32(              \
+                            _low_a,                     \
+                            _MM_SHUFFLE(2, 3, 0, 1)     \
+                        )                               \
                     ),                                  \
                     _mm_mul_epu32(                      \
                         _low_a,                         \
-                        _mm_shuffle_epi32(_low_b, _MM_SHUFFLE(2, 3, 0, 1))\
+                        _mm_shuffle_epi32(              \
+                            _low_b,                     \
+                            _MM_SHUFFLE(2, 3, 0, 1)     \
+                        )                               \
                     )                                   \
                 ),                                      \
                 32                                      \
@@ -764,14 +751,14 @@
         )                                                                       \
     )
 
-#define macro_remove_type_cast(expr) macro_repeat_0 macro_cons_parens expr
 // @@TODO: clean up this MESS!!!!
-#define vect_128_bin_broad_cast_scalrs(oper, oper_a, oper_b)                            \
-    ((typeof(vect_128_broad_cast_if_scalr_or_vect_128(oper_a)))(vect_128_apply_oper(     \
-        oper,                                                                           \
-        vect_memb_t(vect_128_broad_cast_if_scalr_or_vect_128(oper_a)),                  \
-        vect_native(vect_128_broad_cast_if_scalr_or_vect_128(oper_a)),                  \
-        vect_native(vect_128_broad_cast_if_scalr_or_vect_128(oper_b)))))
+#define vect_128_bin_broad_cast_scalrs(oper, oper_a, oper_b) ({     \
+    static const vect_128_t(oper_a, (typeof(oper_a)){0}) _t;        \
+    (typeof(_t))(vect_128_apply_oper(                               \
+        oper,                                                       \
+        vect_memb_t(_t),                                            \
+        vect_128_broad_cast_to_native_if_scalr(oper_a, _t),         \
+        vect_128_broad_cast_to_native_if_scalr(oper_b, _t))); })
 
 
 

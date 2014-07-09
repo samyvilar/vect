@@ -4,7 +4,7 @@
 
 /*** TEST Broadcast assemblies ******************************************************************************/
 #define _vect_128_broad_cast_native(_test_type) ({                      \
-    int temp = 10;       \
+    int temp;       \
     typeof(vect_native((vect_128_t(_test_type)){})) na = scalr_switch(  \
         _test_type,                                                     \
         _mm_set1_pd, _mm_set1_ps,                                       \
@@ -18,12 +18,12 @@
 
 
 #define _test_vect_128_broad_cast_unr_vect(_test_type) ({    \
-    int temp = 10;   \
+    int temp;   \
     vect_128_t(_test_type) a = vect_128_broad_cast(*(_test_type *)&temp); \
     vect_native(a);})
 
 #define _test_vect_128_broad_cast_bin_vect(_test_type) ({       \
-    int temp = 10;                                                   \
+    int temp;                                                   \
     vect_128_t(_test_type) a;                                   \
     vect_128_broad_cast(*(_test_type *)&temp, a);                  \
     vect_native(a);})
@@ -32,7 +32,8 @@
 /*** TEST load assemblies .... ******************************************************************************/
 
 #define _test_vect_128_load_native_(_load_kind, _memb_type) ({   \
-    int temp;\
+    int temp;                                               \
+    static const vect_128_t(_memb_type) _t;                 \
     typeof(vect_native((vect_128_t(_memb_type)){})) _na;    \
     _na = scalr_switch(                                     \
         _memb_type,                                         \
@@ -53,6 +54,7 @@
 
 #define _test_vect_128_load_bin_vect_(_load_kind, _memb_type, args) ({ \
     int temp;   \
+    static const vect_128_t(_memb_type) _t;               \
     vect_128_t(_memb_type) _va;         \
     vect_128_ ## _load_kind args;       \
     vect_native(_va);    })
@@ -76,7 +78,7 @@
 /*** TEST store assemblies *******************************************************/
 
 #define _test_vect_128_store_native_(_store_kind, _test_type) ({        \
-    int temp = 10;                                                      \
+    int temp;                                                      \
     typeof(vect_native((vect_128_t(_test_type)){})) _va;                \
     _va = (typeof(_va))_mm_set1_epi64x((long long)&temp);                          \
     scalr_switch(\
@@ -93,7 +95,7 @@
 #define _test_vect_128_store_align_native(_test_type)   _test_vect_128_store_native_(store_align, _test_type)
 
 #define _test_vect_128_store_vect_(_store_kind, _test_type) ({  \
-    int temp = 10;                      \
+    int temp;                      \
     vect_128_t(_test_type) _va;         \
     vect_128_set_native(_va, (typeof(vect_native(_va)))_mm_set1_epi64x((long long)&temp));    \
     vect_128_ ## _store_kind ((void *)&temp, _va);  \
