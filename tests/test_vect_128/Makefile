@@ -1,6 +1,6 @@
 
 CC=gcc
-CFLAGS=-Wall -Wfatal-errors
+CFLAGS=-Wfatal-errors
 
 test_flt_types=float double
 test_scalr_sint_types=signed_long_long_int signed_long_int signed_int int signed_short_int short_int short signed_char char
@@ -40,23 +40,24 @@ $(foreach oper,$(test_opers),$(foreach kind,$(test_vect_comp_types),$(eval $(cal
 
 define test_vect_128_assembly
 test_vect_128_$(1)_$(2)_native:
-	@$(CC) $(CFLAGS) -S -D_test_oper=$(1)_native -D_test_type=$(2) test_vect_128_$(3)_native.templ.c -o test_vect_128_$(1)_$(2)_native.s
-	@$(CC) $(CFLAGS) -S -D_test_oper=$(1)_vect   -D_test_type=$(2) test_vect_128_$(3)_native.templ.c -o test_vect_128_$(1)_$(2)_vect.s
+	@$(CC) $(CFLAGS) -S -fno-verbose-asm -D_test_oper=$(1)_native -D_test_type=$(2) test_vect_128_native.templ.c -o test_vect_128_$(1)_$(2)_native.s
+	@$(CC) $(CFLAGS) -S -fno-verbose-asm -D_test_oper=$(1)_vect   -D_test_type=$(2) test_vect_128_native.templ.c -o test_vect_128_$(1)_$(2)_vect.s
 	@diff test_vect_128_$(1)_$(2)_native.s test_vect_128_$(1)_$(2)_vect.s
-	@echo "test_vect_128_$$$$(tput setaf 10)$(1)_native$$$$(tput sgr0)($$$$(tput setaf 3)$(2)$$$$(tput sgr0)): $$$$(tput setaf 10)ok.$$$$(tput sgr0)"
+	@echo "test_vect_128_$$$$(tput setaf 2)$(1)_native$$$$(tput sgr0)($$$$(tput setaf 3)$(2)$$$$(tput sgr0)): $$$$(tput setaf 2)ok.$$$$(tput sgr0)"
 
 
 endef
 
-assembly_tests=broad_cast_unr broad_cast_bin
+assembly_tests=broad_cast_unr broad_cast_bin load_bin load_unr load_align_bin load_align_unr store store_align
 $(foreach o,$(assembly_tests),\
 $(foreach t,$(test_vect_comp_types),\
 $(eval $(call test_vect_128_assembly,$(o),$(t),broad_cast))))
 
 test_vect_128_native: $(foreach oper,$(assembly_tests),$(foreach kind,$(test_vect_comp_types),test_vect_128_$(oper)_$(kind)_native))
 
+
 test: $(foreach oper,$(test_opers) $(test_unr_opers) $(test_bin_opers),\
-$(foreach kind,$(test_vect_comp_types),test_vect_128_$(oper)_$(kind))) $(test_vect_128_native)
+$(foreach kind,$(test_vect_comp_types),test_vect_128_$(oper)_$(kind))) test_vect_128_native
 
 clean:
 	rm -f test_vect_128_*.out

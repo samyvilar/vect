@@ -39,7 +39,7 @@
     } vect_t_name(_vect_bit_mag, _memb_name)
 
 #define vect_native(v) ((v)._v) // returns native intrinsic vect type
-#define vect_set_native(v, _v) (vect_native(v) = (_v)) // sets intrinsic vect type
+#define vect_set_native(v, _e) ((v)._v = (_e)) // sets intrinsic vect type
 
 #define vect_membs(v)       ((v)._m)
 #define vect_memb(v, i)     (vect_membs(v)[i])

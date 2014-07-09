@@ -179,7 +179,7 @@
 //                          _memb_name(flt64bit, flt32bit, uint64bit ....)
 
 
-#define vect_128_set_native(_intrnl_v, expr) ({vect_set_native(_intrnl_v, expr); _intrnl_v;})
+#define vect_128_set_native(_intrnl_v, expr) (vect_set_native(_intrnl_v, expr), _intrnl_v)
 
 
 #define _vect_128_native_oper(oper, _memb_kind) \
@@ -288,15 +288,13 @@
 
 // Store 128 bits to either aligned or unaligned address
 #define vect_128_store_(_kind, _p, _v)  ({  \
-    const typeof(_v) _src_ = (_v);          \
-    const typeof(_p) _dest_ = (_p);         \
     vect_128_apply_oper(                    \
         _kind,                              \
-        vect_memb_t(_src_),                 \
-        _dest_,                             \
-        vect_native(_src_)                  \
+        vect_memb_t(_v),                    \
+        _p,                                 \
+        vect_native(_v)                     \
     );                                      \
-    _src_;                                  \
+    _v;                                     \
 })
 
 #undef  vect_128_store_align
@@ -339,17 +337,11 @@
 #define vect_128_load_uint8bit          vect_128_load_intgl
 #define _vect_128_load_(_memb_kind)   _vect_128_native_oper(load, _memb_kind)
 
-#define vect_128_load_bin_(_kind, _p, _v) ({\
-    const typeof((_p)[0]) *_lsrc = (_p);    \
+#define vect_128_load_bin_(_kind, _p, _v)   \
     vect_128_set_native(                    \
         _v,                                 \
-        vect_128_apply_oper(                \
-            _kind,                          \
-            vect_memb_t(_v),                \
-            _lsrc                           \
-        )                                   \
-    );                                      \
-})
+        vect_128_apply_oper(_kind, vect_memb_t(_v), _p)\
+    )                                       \
 
 #define is_vect_128_expr(expr) (                                 \
         comp_types_eq(typeof(expr), vect_128_flt64bit_t)         \

@@ -112,5 +112,6 @@ _test_type _test_side_effects ## _ ## _test_name ## _ ## _test_type (_test_type 
 }                                                               \
 
 
+#define _test_vect_128_assembly(_test_type, _test_kind)  _test_vect_128_ ## _test_kind (_test_type)
 
 #endif // __TEST_VECT_128_H__
