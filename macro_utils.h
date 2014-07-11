@@ -91,24 +91,35 @@
 #define macro_repeat_4(...) macro_repeat_2(__VA_ARGS__) macro_repeat_2(__VA_ARGS__)
 #define macro_repeat_7(...) macro_repeat_4(__VA_ARGS__) macro_repeat_2(__VA_ARGS__) macro_repeat_1(__VA_ARGS__)
 #define macro_repeat_8(...) macro_repeat_4(__VA_ARGS__) macro_repeat_4(__VA_ARGS__)
-
-
 #define macro_repeat_(cnt)  macro_repeat_ ## cnt
 
 #define macro_apply(f, ...) f (__VA_ARGS__)
 // apply macro function to already parentheisized list of arguments ...
 
 
+#define macro_comma_delim_0(arg)
+#define macro_comma_delim_1(arg)    arg
 #define macro_comma_delim_2(arg)    arg, arg
+#define macro_comma_delim_3(arg)    macro_comma_delim_2(arg), macro_comma_delim_1(arg)
 #define macro_comma_delim_4(arg)    macro_comma_delim_2(arg), macro_comma_delim_2(arg)
+#define macro_comma_delim_5(arg)    macro_comma_delim_4(arg), macro_comma_delim_1(arg)
+#define macro_comma_delim_6(arg)    macro_comma_delim_4(arg), macro_comma_delim_2(arg)
+#define macro_comma_delim_7(arg)    macro_comma_delim_6(arg), macro_comma_delim_1(arg)
 #define macro_comma_delim_8(arg)    macro_comma_delim_4(arg), macro_comma_delim_4(arg)
 #define macro_comma_delim_16(arg)   macro_comma_delim_8(arg), macro_comma_delim_8(arg)
+
+#define macro_comma_delim(_imm_literal, arg)  macro_comma_delim ## _imm_literal (arg)
 
 
 #define macro_arg_0(arg_0, args...) arg_0
 #define macro_arg_1(arg_0, arg_1, ...) arg_1
 #define macro_arg_2(arg_0, arg_1, arg_2, ...) arg_2
 #define macro_arg_3(arg_0, arg_1, arg_2, arg_3, ...) arg_3
+#define macro_arg_4(arg_0, arg_1, arg_2, arg_3, arg_4, ...) arg_4
+#define macro_arg_5(arg_0, arg_1, arg_2, arg_3, arg_4, arg_5, ...) arg_5
+
+#define macro_arg(_imm_literal, args...) macro_arg_ ## _imm_literal (args)
+
 
 #define MACRO_NEW_LINE "\n\n"
 

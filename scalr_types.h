@@ -122,6 +122,8 @@
 #define expr_is_intgl(expr) type_is_intgl(typeof(expr))
 //      ^^^^^^^^^^^^^ returns 1 if expr returns a native integral type, 0 otherwise ....
 
+#define expr_is_intgl_bit(expr, bit_size) (expr_is_(expr, sint, bit_size) || expr_is_(expr, uint, bit_size))
+
 #define type_is_scalr(_type) (type_is_intgl(_type) || type_is_flt(_type))
 #define expr_is_scalr(expr) type_is_scalr(typeof(expr))
 //      ^^^^^^^^^^^^^ returns 1 if expr returns a native scalar type, 0 otherwise
@@ -228,8 +230,6 @@
     )
 
 
-
-
 /** SELECT based on type of expression ****/
 #define scalr_switch_sint(expr, if_sint64bit, if_sint32bit, if_sint16bit, if_sint8bit, if_no_match)   \
     (comp_select(expr_is_(expr, sint, 64), if_sint64bit,  \
@@ -238,6 +238,14 @@
     comp_select(expr_is_(expr, sint, 8),  if_sint8bit,   \
         if_no_match)))))
 
+//#define scalr_switch_sint(args...)   \
+//     comp_select(expr_is_(macro_arg(0, args), sint, 64), macro_arg(1, args, macro_comma_delim_5((void)0)),  \
+//     comp_select(expr_is_(macro_arg(0, args), sint, 32), macro_arg(2, args, macro_comma_delim_5((void)0)),  \
+//     comp_select(expr_is_(macro_arg(0, args), sint, 16), macro_arg(3, args, macro_comma_delim_5((void)0)),  \
+//     comp_select(expr_is_(macro_arg(0, args), sint, 8),  macro_arg(4, args, macro_comma_delim_5((void)0)),  \
+//        macro_arg(5, args, macro_comma_delim_5((void)0))))))
+
+
 #define scalr_switch_uint(expr, if_uint64bit, if_uint32bit, if_uint16bit, if_uint8bit, if_no_match)   \
     (comp_select(expr_is_(expr, uint, 64), if_uint64bit,  \
     comp_select(expr_is_(expr, uint, 32), if_uint32bit,  \
@@ -245,11 +253,34 @@
     comp_select(expr_is_(expr, uint, 8),  if_uint8bit,   \
         if_no_match)))))
 
+//#define scalr_switch_uint(args...)   \
+//     comp_select(expr_is_(macro_arg(0, args, 0), uint, 64), macro_arg(1, args, macro_comma_delim_5((void)0)),  \
+//     comp_select(expr_is_(macro_arg(0, args, 0), uint, 32), macro_arg(2, args, macro_comma_delim_5((void)0)), \
+//     comp_select(expr_is_(macro_arg(0, args, 0), uint, 16), macro_arg(3, args, macro_comma_delim_5((void)0)), \
+//     comp_select(expr_is_(macro_arg(0, args, 0), uint, 8),  macro_arg(4, args, macro_comma_delim_5((void)0)), \
+//        macro_arg(5, args, macro_comma_delim_5((void)0))))))
+
+
+#define scalr_switch_oblvs_sign_intgl(expr, if_intgl64bit, if_intgl32bit, if_intgl16bit, if_intgl8bit, if_no_match)  \
+    comp_select(expr_is_intgl_bit(expr, 64), if_intgl64bit, \
+    comp_select(expr_is_intgl_bit(expr, 32), if_intgl32bit, \
+    comp_select(expr_is_intgl_bit(expr, 16), if_intgl16bit, \
+    comp_select(expr_is_intgl_bit(expr, 8),  if_intgl8bit, \
+        if_no_match))))
+
+//#define scalr_switch_oblvs_sign_intgl(args...)  \
+//    comp_select(expr_is_intgl_bit(macro_arg(0, args, 0), 64), macro_arg(1, args, macro_comma_delim_5((void)0)), \
+//    comp_select(expr_is_intgl_bit(macro_arg(0, args, 0), 32), macro_arg(2, args, macro_comma_delim_5((void)0)), \
+//    comp_select(expr_is_intgl_bit(macro_arg(0, args, 0), 16), macro_arg(3, args, macro_comma_delim_5((void)0)), \
+//    comp_select(expr_is_intgl_bit(macro_arg(0, args, 0), 8),  macro_arg(4, args, macro_comma_delim_5((void)0)), \
+//        macro_arg(5, args, macro_comma_delim_5((void)0))))))
+
+
 // select expression on floats
 #define scalr_switch_flt(expr, if_flt64bit, if_flt32bit, if_no_match) \
-    (comp_select(expr_is_(expr, flt, 64), if_flt64bit,   \
+    comp_select(expr_is_(expr, flt, 64), if_flt64bit,   \
     comp_select(expr_is_(expr, flt, 32), if_flt32bit,    \
-    if_no_match)))
+        if_no_match))
 
 // select expression on integrals ...
 #define scalr_switch_intgl(         \
@@ -285,18 +316,18 @@
     )
 
 
-#define scalr_switch_kind(expr, if_flt, if_intgl, if_no_match)                          \
-    macro_apply(                         \
-        scalr_switch_flt,                \
-        expr,                            \
-        macro_unpack_args(if_flt),       \
-        macro_apply(                     \
-            scalr_switch_intgl,          \
-            expr,                        \
-            macro_unpack_args(if_intgl), \
-            if_no_match                  \
-        )                                \
-    )
+//#define scalr_switch_kind(expr, if_flt, if_intgl, if_no_match)                          \
+//    macro_apply(                         \
+//        scalr_switch_flt,                \
+//        expr,                            \
+//        macro_unpack_args(if_flt),       \
+//        macro_apply(                     \
+//            scalr_switch_intgl,          \
+//            expr,                        \
+//            macro_unpack_args(if_intgl), \
+//            if_no_match                  \
+//        )                                \
+//    )
 
 // @@>> DO NOT CHANGE THIS ORDER!!!!
 #define flts_sizes     (flt, 64), (flt, 32)

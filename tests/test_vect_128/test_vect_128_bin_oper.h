@@ -11,10 +11,10 @@
    vect_128_t(_memb_type) _va, _vb, _vo, _vo_vect_sclr, _vo_sclr_vect, _vo_sclr_sclr;               \
     _va = vect_128_load(_a, _va);                                                                   \
     _vb = vect_128_load(_b, _vb);                                                                   \
-    _vo           = macro_packed_args(vect_128_ ## oper, macro_arg_0(args)) /*(_va, _vb, _vo)*/;                                               \
-    _vo_vect_sclr = macro_packed_args(vect_128_ ## oper, macro_arg_1(args)) /*(_va, _b[0], _vo_vect_sclr)*/;                                   \
-    _vo_sclr_vect = macro_packed_args(vect_128_ ## oper, macro_arg_2(args)) /*(_a[0], _vb, _vo_sclr_vect)*/;                                   \
-    _vo_sclr_sclr = macro_packed_args(vect_128_ ## oper, macro_arg_3(args)) /*(_a[0], _b[0], _vo_sclr_sclr)*/;                                 \
+    _vo           = macro_packed_args(vect_128_ ## oper, macro_arg_0(args));                        \
+    _vo_vect_sclr = macro_packed_args(vect_128_ ## oper, macro_arg_1(args));                        \
+    _vo_sclr_vect = macro_packed_args(vect_128_ ## oper, macro_arg_2(args));                        \
+    _vo_sclr_sclr = macro_packed_args(vect_128_ ## oper, macro_arg_3(args));                        \
     int index;                                                                                      \
     for (index = 0; index < vect_memb_cnt(_vo); index++)                                            \
         if ((_res = (scalr_oper(oper)(_a[index], _b[index]))) != vect_memb(_vo, index))             \
@@ -75,69 +75,69 @@
 #define _test_vect_128_sub_bin(_memb_type)  _test_vect_128_oper(sub, _memb_type, bin_opers)
 #define _test_vect_128_mul_bin(_memb_type)  _test_vect_128_oper(mul, _memb_type, bin_opers)
 
+#define to_binary(buffer, expr) ({\
+    typeof(expr) e = (expr);  \
+    char *dest = (buffer);\
+    int __index;  \
+    for (__index = 0; __index < bit_size(e); __index++) {\
+        dest[bit_size(e) - __index - 1] = '0' + scalr_and(_interp(e, flt32bit_t, uint32bit_t), 1);  \
+        e = scalr_rshift_logic(e, 1);   \
+    }\
+    dest; })
 
-//#define _test_vect_128_xor  _test_vect_128_xor_tnr
-//#define _test_vect_128_and  _test_vect_128_and_tnr
-//#define _test_vect_128_or   _test_vect_128_or_tnr
-//#define _test_vect_128_add  _test_vect_128_add_tnr
-//#define _test_vect_128_sub  _test_vect_128_sub_tnr
-//#define _test_vect_128_mul  _test_vect_128_mul_tnr
-
+#define local_temp_str (char [512]){}
 // test
-#define _test_vect_128_opernd_b(oper, _memb_type, oper_b) ({                    \
+#define _test_vect_128_shift(shift_direct, _memb_type, shift_arg, args...) ({                    \
     _memb_type _a[16] = {macro_comma_delim_16(bits_rand(_memb_type))}, _res;    \
-    vect_128_t(_memb_type) _va, _vo;                                        \
+    vect_128_t(_memb_type) _va, _vo, _vb;                                        \
     _va = vect_128_load(_a, _va);                                           \
-    _vo = vect_128_ ## oper(_va, oper_b, _vo);                              \
+    _vo = vect_128_ ## shift_direct(_single_eval(_va, 0), args);                              \
+    _vb = vect_128_ ## shift_direct(_single_eval(_a[0], 10), shift_arg);  \
+    vect_128_ ## shift_direct(_single_eval(_a[0], 11), shift_arg, _vb);  \
     int index;                                                              \
     for (index = 0; index < vect_memb_cnt(_vo); index++)                    \
-        if (scalr_cmp_bits_neq((_res = scalr_oper(oper)(_a[index], oper_b)), vect_memb(_vo, index))) \
+        if (scalr_cmp_bits_neq((_res = scalr_oper(shift_direct)(_a[index], shift_arg)), vect_memb(_vo, index))) \
             error_with_format(                                              \
                 "failed to apply operator vect_128_%s(%s, %s)\n"            \
                 "got: (%s %s %s) == (%s) =/= (%s)\n"                        \
-                ,#oper, #_memb_type, #oper_b                                \
-                ,scalr_str((char [512]){}, _a[index])                       \
-                ,macro_apply(token_str, oper_symbl(oper))                   \
-                ,scalr_str((char [512]){}, oper_b)                          \
-                ,scalr_str((char [512]){}, _res)                            \
-                ,scalr_str((char [512]){}, vect_memb(_vo, index))           \
+                /*"bin(%s): (%s)\n"   \
+                "bin(%s): (%s)\n"   \
+                "bin(%s): (%s)\n"*/   \
+                ,#shift_direct, #_memb_type, #shift_arg                                \
+                ,scalr_str(local_temp_str, _a[index])                       \
+                ,macro_apply(token_str, oper_symbl(shift_direct))                   \
+                ,scalr_str(local_temp_str, shift_arg)                          \
+                ,scalr_str(local_temp_str, _res)                            \
+                ,scalr_str(local_temp_str, vect_memb(_vo, index))           \
+                /*,scalr_str(local_temp_str, _a[index]), to_binary(local_temp_str, _a[index])           \
+                ,scalr_str(local_temp_str, _res), to_binary(local_temp_str, _res)           \
+                ,scalr_str(local_temp_str, vect_memb(_vo, index)), to_binary(local_temp_str, vect_memb(_vo, index))*/ \
             );                                                              \
+        else if (scalr_cmp_bits_neq((_res = scalr_oper(shift_direct)(_a[0], shift_arg)), vect_memb(_vb, index))) \
+            error_with_format("failed to broadcast initial operand of vect_128_%s\n", #shift_direct); \
+    })
+
+#define _test_vect_128_lshift_imm_bin(_memb_type) _test_vect_128_shift(lshift, _memb_type, 5, 5)
+#define _test_vect_128_lshift_imm_tnr(_memb_type) _test_vect_128_shift(lshift, _memb_type, 5, 5, _vo)
+
+#define _test_vect_128_shift_scalr(shift_kind, _memb_type, args...) ({  \
+    int temp = rand() % bit_size(_memb_type);   \
+    _test_vect_128_shift(shift_kind, _memb_type, temp, args);     \
 })
+#define _test_vect_128_lshift_scalr_bin(_memb_type) _test_vect_128_shift_scalr(lshift, _memb_type, temp)
+#define _test_vect_128_lshift_scalr_tnr(_memb_type) _test_vect_128_shift_scalr(lshift, _memb_type, _single_eval(temp, 1), _vo)
 
-#define _test_vect_128_lshift_imm(_memb_type)   _test_vect_128_opernd_b(lshift_imm, _memb_type, 5)
 
-#define _test_vect_128_lshift_scalr(_memb_type) ({                  \
-    int temp = rand() % bit_size(_memb_type);                       \
-    _test_vect_128_opernd_b(lshift_scalr, _memb_type, temp);        \
-})
+#define _test_vect_128_rshift_logic_imm_bin(_memb_type)     _test_vect_128_shift(rshift_logic, _memb_type, 5, 5)
+#define _test_vect_128_rshift_logic_imm_tnr(_memb_type)     _test_vect_128_shift(rshift_logic, _memb_type, 5, 5, _vo)
+#define _test_vect_128_rshift_logic_scalr_bin(_memb_type)   _test_vect_128_shift_scalr(rshift_logic, _memb_type, _single_eval(temp, 1))
+#define _test_vect_128_rshift_logic_scalr_tnr(_memb_type)   _test_vect_128_shift_scalr(rshift_logic, _memb_type, _single_eval(temp, 1), _vo)
 
-#define _test_vect_128_lshift(_memb_type) ({                        \
-    _test_vect_128_opernd_b(lshift, _memb_type, 4);                 \
-    int temp = rand() % bit_size(_memb_type);                       \
-    _test_vect_128_opernd_b(lshift, _memb_type, temp);              \
-})
+#define _test_vect_128_rshift_arith_imm_bin(_memb_type)     _test_vect_128_shift(rshift_arith, _memb_type, 5, 5)
+#define _test_vect_128_rshift_arith_imm_tnr(_memb_type)     _test_vect_128_shift(rshift_arith, _memb_type, 5, 5, _vo)
+#define _test_vect_128_rshift_arith_scalr_bin(_memb_type)   _test_vect_128_shift_scalr(rshift_arith, _memb_type, _single_eval(temp, 1))
+#define _test_vect_128_rshift_arith_scalr_tnr(_memb_type)   _test_vect_128_shift_scalr(rshift_arith, _memb_type, _single_eval(temp, 1), _vo)
 
-#define _test_vect_128_rshift_logic_imm(_memb_type)     _test_vect_128_opernd_b(rshift_logic_imm, _memb_type, 5)
-#define _test_vect_128_rshift_logic_scalr(_memb_type)   ({          \
-    int temp = rand() % bit_size(_memb_type);                       \
-    _test_vect_128_opernd_b(rshift_logic_scalr, _memb_type, temp);  \
-  })
-#define _test_vect_128_rshift_logic(_memb_type)   ({                \
-    _test_vect_128_opernd_b(rshift_logic, _memb_type, 4);           \
-    int temp = rand() % bit_size(_memb_type);                       \
-    _test_vect_128_opernd_b(rshift_logic, _memb_type, temp);        \
- })
-
-#define _test_vect_128_rshift_arith_imm(_memb_type)     _test_vect_128_opernd_b(rshift_arith_imm, _memb_type, 5)
-#define _test_vect_128_rshift_arith_scalr(_memb_type)   ({          \
-    int temp = rand() % bit_size(_memb_type);                       \
-    _test_vect_128_opernd_b(rshift_arith_scalr, _memb_type, temp);  \
- })
-#define _test_vect_128_rshift_arith(_memb_type) ({                  \
-    _test_vect_128_opernd_b(rshift_arith, _memb_type, 4);           \
-    int temp = rand() % bit_size(_memb_type);                       \
-    _test_vect_128_opernd_b(rshift_arith, _memb_type, temp);        \
-})
 
 
 #define _test_vect_128_extrt_imm_at_(_memb_type, va, index)     \

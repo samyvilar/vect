@@ -12,12 +12,16 @@ test_typedef_native_sclar_types=double_t float_t sllint_t slint_t sint_t s_t int
 test_vect_comp_types=$(test_scalr_types) $(test_typedef_native_sclar_types)
 
 test_opers=decl broad_cast load store set
-test_unr_opers=sign_ext
-test_bin_opers=xor_bin xor_tnr and_bin and_tnr or_bin or_tnr add_bin add_tnr sub_bin sub_tnr mul_bin mul_tnr lshift_imm lshift_scalr lshift rshift_logic_imm rshift_logic_scalr rshift_logic rshift_arith_imm rshift_arith_scalr rshift_arith
-#test_bin_opers=$(foreach o,$(opers),$(o)_bin)
-#test_tnr_opers=$(foreach o,$(opers),$(o)_tnr)
-#test_opers=$(test_bin_opers) $(test_tnr_opers)
+test_unr_opers=sign_ext_unr sign_ext_bin
 
+shift_kinds=lshift rshift_logic rshift_arith
+shift_mag_kinds=imm scalr
+shift_arg_cnt_kinds=bin tnr
+shift_test_opers=$(foreach shft,$(shift_kinds),\
+$(foreach mg_t,$(shift_mag_kinds),\
+$(foreach arc,$(shift_arg_cnt_kinds),$(shft)_$(mg_t)_$(arc))))
+
+test_bin_opers=xor_bin xor_tnr and_bin and_tnr or_bin or_tnr add_bin add_tnr sub_bin sub_tnr mul_bin mul_tnr $(shift_test_opers)
 
 
 define test_vect_128_
@@ -26,6 +30,12 @@ define test_vect_128_
 
 
 endef
+
+define get_test_names
+$(foreach kind,$(test_vect_comp_types),test_vect_128_$(1)_$(kind))
+endef
+
+test_vect_128_shifts: $(foreach opr,$(shift_test_opers),$(call get_test_names,$(opr)))
 
 define test_vect_128_templ_oper_kind
 test_vect_128_$(1)_$(2):
