@@ -3,6 +3,32 @@
 
 #include "test_vect_128_common.h"
 
+#define _test_vect_128_load(_memb_type, load_kind, args, d) ({      \
+    _memb_type __attribute__ ((aligned (64))) *_r = (typeof(*_r)[16]){macro_comma_delim_16(bits_rand(_memb_type))};\
+    vect_128_t(_memb_type) _v, _temp;                               \
+    d = vect_128_ ## load_kind args;                                \
+    int index;                                                      \
+    for (index = 0; index < vect_memb_cnt(_v); index++) {           \
+        if (vect_memb(_v, index) != _r[index])                      \
+            error_with_format(                                      \
+                "failed to load member type %s\n", #_memb_type      \
+            );                                                      \
+        _r[index] = -1;                                             \
+    }                                                               \
+});
+
+
+#define _test_vect_128_load_bin(_memb_type)             _test_vect_128_load(_memb_type, load, (_single_eval(_r, 0), _v), _temp)
+#define _test_vect_128_load_bin_assign(_memb_type)             _test_vect_128_load(_memb_type, load, (_single_eval(_r, 1), _v), _v)
+#define _test_vect_128_load_align_bin(_memb_type)       _test_vect_128_load(_memb_type, load_align, (_single_eval(_r, 2), _v), _temp)
+#define _test_vect_128_load_align_bin_assign(_memb_type)       _test_vect_128_load(_memb_type, load_align, (_single_eval(_r, 3), _v), _v)
+
+#define _test_vect_128_load_unr(_memb_type)             _test_vect_128_load(_memb_type, load, (_single_eval(_r, 4)), _v)
+#define _test_vect_128_load_align_unr(_memb_type)       _test_vect_128_load(_memb_type, load_align, (_single_eval(_r, 6)), _v)
+#define _test_vect_128_load_unr_vect_128_p(_memb_type)  _test_vect_128_load(_memb_type, load, ((vect_128_t(_r[0]) *)_single_eval(_r, 5)), _v)
+#define _test_vect_128_load_align_unr_vect_128_p(_memb_type) _test_vect_128_load(_memb_type, load_align, ((vect_128_t(_r[0]) *)_single_eval(_r, 7)), _v)
+
+
 #define macro_packed_args(f, args) f args
 
 #define _test_vect_128_oper(oper, _memb_type, args...) ({                                           \
@@ -93,7 +119,7 @@
     _va = vect_128_load(_a, _va);                                           \
     _vo = vect_128_ ## shift_direct(_single_eval(_va, 0), args);                              \
     _vb = vect_128_ ## shift_direct(_single_eval(_a[0], 10), shift_arg);  \
-    vect_128_ ## shift_direct(_single_eval(_a[0], 11), shift_arg, _vb);  \
+    /*vect_128_ ## shift_direct(_single_eval(_a[0], 11), shift_arg, _vb);*/  \
     int index;                                                              \
     for (index = 0; index < vect_memb_cnt(_vo); index++)                    \
         if (scalr_cmp_bits_neq((_res = scalr_oper(shift_direct)(_a[index], shift_arg)), vect_memb(_vo, index))) \

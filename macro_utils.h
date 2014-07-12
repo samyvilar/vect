@@ -121,6 +121,16 @@
 #define macro_arg(_imm_literal, args...) macro_arg_ ## _imm_literal (args)
 
 
+#define macro_select_args_2(arg_0, arg_1, ...) arg_0, arg_1
+#define macro_select_args_4(arg_0, arg_1, ...) arg_0, arg_1, macro_select_args_2(__VA_ARGS__)
+#define macro_select_args_8(arg_0, arg_1, arg_2, arg_3, ...) arg_0, arg_1, arg_2, arg_3, macro_select_args_4(__VA_ARGS__)
+#define macro_select_args_16(arg_0, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7, ...)\
+    arg_0, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7, macro_select_args_8(__VA_ARGS__)
+
+#define macro_select_args(cnt, ...) macro_select_args_ ## cnt (__VA_ARGS__)
+
+
+
 #define MACRO_NEW_LINE "\n\n"
 
 

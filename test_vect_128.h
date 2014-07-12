@@ -109,6 +109,7 @@ static char _called[200] = {0};
 //    (expr); })
 
 
-#define _test_vect_128_assembly(_test_type, _test_kind)  _test_vect_128_ ## _test_kind (_test_type)
+#define get_test_name(_test) _test_vect_128_ ## _test
+#define _test_vect_128_assembly(_test_type, _test_kind)  get_test_name(_test_kind) (_test_type)
 
 #endif // __TEST_VECT_128_H__
