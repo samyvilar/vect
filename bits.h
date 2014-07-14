@@ -272,9 +272,18 @@ typedef struct packed_bits_t {  // represents a set of packed bits, used to stor
     )
 #define leadn_one_index(x) (bit_size(x) - cnt_leadn_zrs(x))
 
-
-#define rand_entropy_bit_mag leadn_one_index(RAND_MAX) // rands number of bits
-#define rand_enty_cnt(_t) ((bit_size(_t)/rand_entropy_bit_mag) + !!(bit_size(_t) % rand_entropy_bit_mag))
+#if     (RAND_MAX == 0xffffffff)
+    #define rand_entropy_bit_mag 32
+#elif   (RAND_MAX == 0x7fffffff)
+    #define rand_entropy_bit_mag 31
+#elif   (RAND_MAX == 0x3fffffff)
+    #define rand_entropy_bit_mag 30
+#elif (RAND_MAX == 32767)
+    #define rand_entropy_bit_mag 15
+#else
+    #define rand_entropy_bit_mag leadn_one_index(RAND_MAX) // rands number of bits
+#endif
+#define rand_enty_cnt(a) ((bit_size(a)/rand_entropy_bit_mag) + !!(bit_size(a) % rand_entropy_bit_mag))
 
 #define bits_rand(_t) ({                                                                \
     int _rand_bits[rand_enty_cnt(_t)];                                                  \
@@ -287,14 +296,14 @@ typedef struct packed_bits_t {  // represents a set of packed bits, used to stor
         _t,                                                                             \
         ((*(sint_bit_t(64) *)_rand_bits) / ((double)(-1LLU))),                          \
         ((*(sint_bit_t(32) *)_rand_bits) / (float)(-1U)),                               \
-        *(sint_bit_t(64) *)_rand_bits,                                                  \
-        *(sint_bit_t(32) *)_rand_bits,                                                  \
-        *(sint_bit_t(16) *)_rand_bits,                                                  \
-        *(sint_bit_t(8) *)_rand_bits,                                                   \
-        *(uint_bit_t(64) *)_rand_bits,                                                  \
-        *(uint_bit_t(32) *)_rand_bits,                                                  \
-        *(uint_bit_t(16) *)_rand_bits,                                                  \
-        *(uint_bit_t(8) *)_rand_bits,                                                   \
+        (*(sint_bit_t(64) *)_rand_bits),                                                  \
+        (*(sint_bit_t(32) *)_rand_bits),                                                  \
+        (*(sint_bit_t(16) *)_rand_bits),                                                  \
+        (*(sint_bit_t(8) *)_rand_bits),                                                   \
+        (*(uint_bit_t(64) *)_rand_bits),                                                  \
+        (*(uint_bit_t(32) *)_rand_bits),                                                  \
+        (*(uint_bit_t(16) *)_rand_bits),                                                  \
+        (*(uint_bit_t(8) *)_rand_bits),                                                   \
         (void)0                                                                         \
     ); })
 /* ^^^^^^^^^^^^^^^^^^^^^^^^ returns a random number from a type or expr, if type is flt,

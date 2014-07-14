@@ -1,6 +1,10 @@
 
 CC=gcc
-CFLAGS=-Wfatal-errors -fmacro-backtrace-limit=0
+
+CFLAGS=-Wfatal-errors
+ifeq ($(CC),gcc)
+CFLAGS+=-fmacro-backtrace-limit=0
+endif
 
 test_flt_types=float double
 test_scalr_sint_types=signed_long_long_int signed_long_int signed_int int signed_short_int short_int short signed_char char
@@ -11,10 +15,10 @@ test_typedef_native_sclar_types=double_t float_t sllint_t slint_t sint_t s_t int
 
 test_vect_comp_types=$(test_scalr_types) $(test_typedef_native_sclar_types)
 
-test_opers=decl broad_cast store set
-test_unr_opers=sign_ext_unr sign_ext_bin
+test_opers=decl broad_cast
+test_unr_opers=sign_ext_unr
 
-arg_cnt_kinds=bin tnr
+arg_cnt_kinds=bin
 
 shift_kinds=lshift rshift_logic rshift_arith
 shift_mag_kinds=imm scalr
@@ -22,13 +26,15 @@ shift_test_opers=$(foreach shft,$(shift_kinds),\
 $(foreach mg_t,$(shift_mag_kinds),\
 $(foreach arc,$(arg_cnt_kinds),$(shft)_$(mg_t)_$(arc))))
 
-load_test_opers=load_bin load_bin_assign load_align_bin load_align_bin_assign load_unr load_align_unr load_unr_vect_128_p load_align_unr_vect_128_p
-test_bin_opers=$(load_test_opers) xor_bin xor_tnr and_bin and_tnr or_bin or_tnr add_bin add_tnr sub_bin sub_tnr mul_bin mul_tnr $(shift_test_opers)
+load_test_opers=load_unr load_align_unr load_unr_vect_128_p load_align_unr_vect_128_p
+store_test_opers=store store_align
+test_bin_opers=set $(load_test_opers) $(store_test_opers) xor_bin and_bin or_bin add_bin sub_bin mul_bin $(shift_test_opers)
 
+v=@
 
 define test_vect_128_
-	@$(CC) $(CFLAGS) -D_test_oper=$(1) -D_test_type=$(2) test_vect_128_$(3).templ.c -o test_vect_128_$(1)_$(2).out
-	@./test_vect_128_$(1)_$(2).out
+	$(v)$(CC) $(CFLAGS) -D_test_oper=$(1) -D_test_type=$(2) test_vect_128_$(3).templ.c -o test_vect_128_$(1)_$(2).out
+	$(v)./test_vect_128_$(1)_$(2).out
 
 
 endef
@@ -70,7 +76,7 @@ test_vect_128_$(1)_$(2)_native:
 
 endef
 
-assembly_tests=broad_cast_unr broad_cast_bin load_bin load_unr load_align_bin load_align_unr store store_align
+assembly_tests=broad_cast_unr load_unr load_align_unr store store_align
 $(foreach o,$(assembly_tests),\
 $(foreach t,$(test_vect_comp_types),\
 $(eval $(call test_vect_128_assembly,$(o),$(t),broad_cast))))

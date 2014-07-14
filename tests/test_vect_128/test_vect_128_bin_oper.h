@@ -3,6 +3,24 @@
 
 #include "test_vect_128_common.h"
 
+
+#define _test_vect_128_set(_memb_type)  ({                     \
+    vect_128_t(_memb_type) _v;                                              \
+    _memb_type ms[] = {macro_comma_delim_16(bits_rand(_memb_type))};        \
+    _v = vect_128_set(                                                      \
+        ms[0], ms[1], ms[2], ms[3], ms[4], ms[5], ms[6], ms[7],             \
+        ms[8], ms[9], ms[10], ms[11], ms[12], ms[13], ms[14], ms[15]        \
+    );                                                                     \
+    typeof(vect_memb_cnt(_v)) index;                                        \
+    for (index = 0; index < vect_memb_cnt(_v); index++)                     \
+        if (ms[index] != vect_memb(_v, vect_memb_cnt(_v) - index - 1))      \
+            error_with_format(                                              \
+                "failed to set vector component at index %lu\n", index      \
+            );                                                              \
+});
+
+
+
 #define _test_vect_128_load(_memb_type, load_kind, args, d) ({      \
     _memb_type __attribute__ ((aligned (64))) *_r = (typeof(*_r)[16]){macro_comma_delim_16(bits_rand(_memb_type))};\
     vect_128_t(_memb_type) _v, _temp;                               \
@@ -29,14 +47,33 @@
 #define _test_vect_128_load_align_unr_vect_128_p(_memb_type) _test_vect_128_load(_memb_type, load_align, ((vect_128_t(_r[0]) *)_single_eval(_r, 7)), _v)
 
 
+#define _test_vect_128_store_(_memb_type, store_kind) ({                             \
+    _memb_type _src[] __attribute__ ((aligned (64))) = {macro_comma_delim_16(bits_rand(_memb_type))};  \
+    _memb_type _dest[16] __attribute__ ((aligned (64)));                                               \
+    vect_128_t(_memb_type) _v;                                          \
+    _v = vect_128_load((typeof(_v) *)_src);                         \
+    vect_128_## store_kind((typeof(_v) *)_dest, _v);                       \
+    if (memcmp(_src, _dest, 16))                                        \
+        error_with_format(                                              \
+            "failed to store member type %s\n", #_memb_type             \
+        );                                                              \
+ });
+
+
+#define _test_vect_128_store(_memb_type) _test_vect_128_store_(_memb_type, store);
+#define _test_vect_128_store_align(_memb_type) _test_vect_128_store_(_memb_type, store_align);
+
+
+
+
 #define macro_packed_args(f, args) f args
 
 #define _test_vect_128_oper(oper, _memb_type, args...) ({                                           \
     _memb_type _a[16] = {macro_comma_delim_16(bits_rand(_memb_type))},                              \
                _b[16] = {macro_comma_delim_16(bits_rand(_memb_type))}, _res;                        \
    vect_128_t(_memb_type) _va, _vb, _vo, _vo_vect_sclr, _vo_sclr_vect, _vo_sclr_sclr;               \
-    _va = vect_128_load(_a, _va);                                                                   \
-    _vb = vect_128_load(_b, _vb);                                                                   \
+    _va = vect_128_load(_a);                                                                   \
+    _vb = vect_128_load(_b);                                                                   \
     _vo           = macro_packed_args(vect_128_ ## oper, macro_arg_0(args));                        \
     _vo_vect_sclr = macro_packed_args(vect_128_ ## oper, macro_arg_1(args));                        \
     _vo_sclr_vect = macro_packed_args(vect_128_ ## oper, macro_arg_2(args));                        \
@@ -116,7 +153,7 @@
 #define _test_vect_128_shift(shift_direct, _memb_type, shift_arg, args...) ({                    \
     _memb_type _a[16] = {macro_comma_delim_16(bits_rand(_memb_type))}, _res;    \
     vect_128_t(_memb_type) _va, _vo, _vb;                                        \
-    _va = vect_128_load(_a, _va);                                           \
+    _va = vect_128_load(_a);                                           \
     _vo = vect_128_ ## shift_direct(_single_eval(_va, 0), args);                              \
     _vb = vect_128_ ## shift_direct(_single_eval(_a[0], 10), shift_arg);  \
     /*vect_128_ ## shift_direct(_single_eval(_a[0], 11), shift_arg, _vb);*/  \

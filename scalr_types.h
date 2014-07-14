@@ -233,53 +233,31 @@
 /** SELECT based on type of expression ****/
 #define scalr_switch_sint(expr, if_sint64bit, if_sint32bit, if_sint16bit, if_sint8bit, if_no_match)   \
     (comp_select(expr_is_(expr, sint, 64), if_sint64bit,  \
-    comp_select(expr_is_(expr, sint, 32), if_sint32bit,   \
-    comp_select(expr_is_(expr, sint, 16), if_sint16bit,  \
-    comp_select(expr_is_(expr, sint, 8),  if_sint8bit,   \
+     comp_select(expr_is_(expr, sint, 32), if_sint32bit,  \
+     comp_select(expr_is_(expr, sint, 16), if_sint16bit,  \
+     comp_select(expr_is_(expr, sint, 8),  if_sint8bit,   \
         if_no_match)))))
 
-//#define scalr_switch_sint(args...)   \
-//     comp_select(expr_is_(macro_arg(0, args), sint, 64), macro_arg(1, args, macro_comma_delim_5((void)0)),  \
-//     comp_select(expr_is_(macro_arg(0, args), sint, 32), macro_arg(2, args, macro_comma_delim_5((void)0)),  \
-//     comp_select(expr_is_(macro_arg(0, args), sint, 16), macro_arg(3, args, macro_comma_delim_5((void)0)),  \
-//     comp_select(expr_is_(macro_arg(0, args), sint, 8),  macro_arg(4, args, macro_comma_delim_5((void)0)),  \
-//        macro_arg(5, args, macro_comma_delim_5((void)0))))))
-
-
 #define scalr_switch_uint(expr, if_uint64bit, if_uint32bit, if_uint16bit, if_uint8bit, if_no_match)   \
-    (comp_select(expr_is_(expr, uint, 64), if_uint64bit,  \
+    (comp_select(expr_is_(expr, uint, 64), if_uint64bit, \
     comp_select(expr_is_(expr, uint, 32), if_uint32bit,  \
     comp_select(expr_is_(expr, uint, 16), if_uint16bit,  \
     comp_select(expr_is_(expr, uint, 8),  if_uint8bit,   \
         if_no_match)))))
-
-//#define scalr_switch_uint(args...)   \
-//     comp_select(expr_is_(macro_arg(0, args, 0), uint, 64), macro_arg(1, args, macro_comma_delim_5((void)0)),  \
-//     comp_select(expr_is_(macro_arg(0, args, 0), uint, 32), macro_arg(2, args, macro_comma_delim_5((void)0)), \
-//     comp_select(expr_is_(macro_arg(0, args, 0), uint, 16), macro_arg(3, args, macro_comma_delim_5((void)0)), \
-//     comp_select(expr_is_(macro_arg(0, args, 0), uint, 8),  macro_arg(4, args, macro_comma_delim_5((void)0)), \
-//        macro_arg(5, args, macro_comma_delim_5((void)0))))))
 
 
 #define scalr_switch_oblvs_sign_intgl(expr, if_intgl64bit, if_intgl32bit, if_intgl16bit, if_intgl8bit, if_no_match)  \
     comp_select(expr_is_intgl_bit(expr, 64), if_intgl64bit, \
     comp_select(expr_is_intgl_bit(expr, 32), if_intgl32bit, \
     comp_select(expr_is_intgl_bit(expr, 16), if_intgl16bit, \
-    comp_select(expr_is_intgl_bit(expr, 8),  if_intgl8bit, \
+    comp_select(expr_is_intgl_bit(expr, 8),  if_intgl8bit,  \
         if_no_match))))
-
-//#define scalr_switch_oblvs_sign_intgl(args...)  \
-//    comp_select(expr_is_intgl_bit(macro_arg(0, args, 0), 64), macro_arg(1, args, macro_comma_delim_5((void)0)), \
-//    comp_select(expr_is_intgl_bit(macro_arg(0, args, 0), 32), macro_arg(2, args, macro_comma_delim_5((void)0)), \
-//    comp_select(expr_is_intgl_bit(macro_arg(0, args, 0), 16), macro_arg(3, args, macro_comma_delim_5((void)0)), \
-//    comp_select(expr_is_intgl_bit(macro_arg(0, args, 0), 8),  macro_arg(4, args, macro_comma_delim_5((void)0)), \
-//        macro_arg(5, args, macro_comma_delim_5((void)0))))))
 
 
 // select expression on floats
 #define scalr_switch_flt(expr, if_flt64bit, if_flt32bit, if_no_match) \
-    comp_select(expr_is_(expr, flt, 64), if_flt64bit,   \
-    comp_select(expr_is_(expr, flt, 32), if_flt32bit,    \
+    comp_select(expr_is_(expr, flt, 64), if_flt64bit,       \
+    comp_select(expr_is_(expr, flt, 32), if_flt32bit,       \
         if_no_match))
 
 // select expression on integrals ...
@@ -316,31 +294,18 @@
     )
 
 
-//#define scalr_switch_kind(expr, if_flt, if_intgl, if_no_match)                          \
-//    macro_apply(                         \
-//        scalr_switch_flt,                \
-//        expr,                            \
-//        macro_unpack_args(if_flt),       \
-//        macro_apply(                     \
-//            scalr_switch_intgl,          \
-//            expr,                        \
-//            macro_unpack_args(if_intgl), \
-//            if_no_match                  \
-//        )                                \
-//    )
-
 // @@>> DO NOT CHANGE THIS ORDER!!!!
-#define flts_sizes     (flt, 64), (flt, 32)
-#define sints_sizes    (sint, 64), (sint, 32), (sint, 16), (sint, 8)
-#define uints_sizes    (uint, 64), (uint, 32), (uint, 16), (uint, 8)
-#define scalr_intlg_cnt 8
+//#define flts_sizes     (flt, 64), (flt, 32)
+//#define sints_sizes    (sint, 64), (sint, 32), (sint, 16), (sint, 8)
+//#define uints_sizes    (uint, 64), (uint, 32), (uint, 16), (uint, 8)
+//#define scalr_intlg_cnt 8
 
-#define intgls_sizes   sints_sizes, uints_sizes
-#define scalrs_params_kinds_sizes   flts_sizes, intgls_sizes
+//#define intgls_sizes   sints_sizes, uints_sizes
+//#define scalrs_params_kinds_sizes   flts_sizes, intgls_sizes
 /**************************************************************************/
 
-#define type_bit_name_list(_kind_and_size) type_bit_name _kind_and_size
-#define scalrs_names MAP_LIST(type_bit_name_list, scalrs_params_kinds_sizes)
+//#define type_bit_name_list(_kind_and_size) type_bit_name _kind_and_size
+//#define scalrs_names MAP_LIST(type_bit_name_list, scalrs_params_kinds_sizes)
 
 // select expression on scalars
 #define scalr_switch(               \
@@ -360,19 +325,20 @@
     if_uint8bit,                    \
                                     \
     if_no_match                     \
-)                                   \
+) ({                                \
+    typedef typeof(expr) _expr_scalr_switch_t; \
     scalr_switch_flt(               \
-        expr,                       \
+        _expr_scalr_switch_t,       \
         if_flt64bit,                \
         if_flt32bit,                \
         scalr_switch_sint(          \
-            expr,                   \
+            _expr_scalr_switch_t,   \
             if_sint64bit,           \
             if_sint32bit,           \
             if_sint16bit,           \
             if_sint8bit,            \
             scalr_switch_uint(      \
-                expr,               \
+                _expr_scalr_switch_t,\
                 if_uint64bit,       \
                 if_uint32bit,       \
                 if_uint16bit,       \
@@ -381,7 +347,21 @@
                 if_no_match         \
             )                       \
         )                           \
-    )
+    ); })
+
+#define scalr_switch_on_byte_size(expr, if_8bytes, if_4bytes, if_2bytes, if_1bytes, if_no_match) \
+    comp_select(sizeof(expr) == 8, if_8bytes,   \
+    comp_select(sizeof(expr) == 4, if_4bytes,   \
+    comp_select(sizeof(expr) == 2, if_2bytes,   \
+    comp_select(sizeof(expr) == 1, if_1bytes,   \
+        if_no_match))))
+
+#define scalr_switch_flt_or_intgl_byte_sizes(expr, if_flt8bytes, if_flt4bytes, if_8bytes, if_4bytes, if_2bytes, if_1bytes, if_no_match) ({\
+    typedef typeof(expr) _exprscalr_intf_byt_size_t;                             \
+    comp_select(expr_is_(_exprscalr_intf_byt_size_t, flt, 64), if_flt8bytes,   \
+    comp_select(expr_is_(_exprscalr_intf_byt_size_t, flt, 32), if_flt4bytes,   \
+        scalr_switch_on_byte_size(_exprscalr_intf_byt_size_t, if_8bytes, if_4bytes, if_2bytes, if_1bytes, if_no_match))); })
+
 
 #include <stdio.h>
 #define scalr_str(buffer, _expr) ({             \
