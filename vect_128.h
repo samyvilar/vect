@@ -98,26 +98,23 @@
 #define vect_128_uint8bit_native_t   vect_128_intgl_native_t
 
 
-#define vect_128_typedef(_memb_name)    vect_typedef(128, _memb_name);
-/*      ^^^^^^^^^^^^^^^^ typedef a new internal vect_128 type containing packed (flt64bit, flt32bit, sint64bit ...)*/
-
 
 //#define FAST_COMPILATION
 
 
 //#ifdef FAST_COMPILATION
-vect_128_typedef(flt64bit)
-vect_128_typedef(flt32bit)
+vect_typedef(128, flt64bit);
+vect_typedef(128, flt32bit);
 
-vect_128_typedef(sint64bit)
-vect_128_typedef(sint32bit)
-vect_128_typedef(sint16bit)
-vect_128_typedef(sint8bit)
+vect_typedef(128, sint64bit);
+vect_typedef(128, sint32bit);
+vect_typedef(128, sint16bit);
+vect_typedef(128, sint8bit);
 
-vect_128_typedef(uint64bit)
-vect_128_typedef(uint32bit)
-vect_128_typedef(uint16bit)
-vect_128_typedef(uint8bit)
+vect_typedef(128, uint64bit);
+vect_typedef(128, uint32bit);
+vect_typedef(128, uint16bit);
+vect_typedef(128, uint8bit);
 //#else
 //    MAP(vect_128_typedef, scalrs_names
 //#endif
@@ -320,7 +317,7 @@ vect_128_to_native_intgl_tmpl(uint8bit)
 #define vect_128_store(_p, _v)       vect_128_store_(store, _p, _v)
                     
 
-/***** SET each component of a vector from most sign to leas ....   ************************************/
+/***** SET each component of a vector from most signf to least ....   ************************************/
 #define vect_128_set_flt64bit(args...)      _mm_set_pd     (macro_select_args(2, args))
 #define vect_128_set_flt32bit(args...)      _mm_set_ps     (macro_select_args(4, args))
 #define vect_128_set_intgl64bit(args...)    _mm_set_epi64x (macro_select_args(2, args))
@@ -340,7 +337,134 @@ vect_128_to_native_intgl_tmpl(uint8bit)
         vect_128_set_intgl8bit(exprs, macro_comma_delim_16(0)),    \
         vect_128_unable_to_determine_type ); })
 
-                                                                                                                                                                                                                                                                                                        
+/*** EXTRACT a component *******************************************************************************/
+#ifndef __SSE4_1__
+    // _mm_cvtsi128_si64x 1x(2, 0)
+    // _mm_srli_si128 !!_imm x(1, 0.5)
+    // (2 - 3) cycles ...
+    vect_128_intrs_signt(sint_bit_t(64)) _mm_extract_epi64(__m128i a, int _imm)  {
+        return _mm_cvtsi128_si64((_imm & 1) ? _mm_srli_si128(a, 8) : a);
+    }
+
+    // _mm_cvtsi128_si32: 1x(2, 0.5)
+    // _mm_srli_si128 !!_imm x (1, 0.5)
+    // (2 - 3) cycles ...
+    vect_128_intrs_signt(sint_bit_t(32)) _mm_extract_epi32(__m128i a, int _imm) {
+        switch (_imm & 0b11) {
+            case 3: return _mm_cvtsi128_si32(_mm_srli_si128(a, 12));
+            case 2: return _mm_cvtsi128_si32(_mm_srli_si128(a, 8));
+            case 1: return _mm_cvtsi128_si32(_mm_srli_si128(a, 4));
+            case 0: return _mm_cvtsi128_si32(a);
+//            default: {extern void error_invalid_index(); error_invalid_index(); }
+        }
+        return 0;
+    }
+
+    vect_128_intrs_signt(flt_bit_t(32)) _mm_extract_ps(__m128 a, int _imm) {
+        switch (_imm) {
+            case 3: return _mm_cvtss_f32(_mm_srli_si128(a, 12));
+            case 2: return _mm_cvtss_f32(_mm_srli_si128(a, 8));
+            case 1: return _mm_cvtss_f32(_mm_srli_si128(a, 4));
+            case 0: return _mm_cvtss_f32(a);
+//            default: {extern void error_invalid_index(); error_invalid_index(); }
+        }
+        return 0;
+    }
+
+#ifdef __SSSE3__
+    // dst[7:0] := (a[127:0] >> (imm[3:0] * 8))[7:0] // 2-3 cycles
+    // _mm_extract_epi16 1x(3 [2.5], 1) (SSSE3)
+    // _mm_cvtsi128_si32 1x(2, 1)
+    // _mm_shuffle_epi8 1x(1, 0.5)
+    // about 4 cycles ... (assuming _mm_set_epi8 is 0)
+    vect_128_intrs_signt(sint_bit_t(8)) _mm_extract_epi8(__m128i a, int _imm)  {
+        switch (_imm & 0b1111) {
+            case 8 ... 15:
+                return _mm_extract_epi16(
+                    _mm_shuffle_epi8(
+                        a,
+                        _mm_set_epi8(
+                            0x80, 15, 0x80, 14, 0x80, 13, 0x80, 12,
+                            0x80, 11, 0x80, 10, 0x80, 9,  0x80, 8
+                        )
+                    ),
+                    _imm - 8
+                ) & 0xFF;
+            case 1 ... 7:
+                return _mm_extract_epi16(
+                    _mm_shuffle_epi8(
+                        a,
+                        _mm_set_epi8(
+                            0x80, 7, 0x80, 6, 0x80, 5, 0x80, 4,
+                            0x80, 3, 0x80, 2, 0x80, 1, 0x80, 0
+                        )
+                    ),
+                    _imm
+                ) & 0xFF;
+            case 0: return _mm_cvtsi128_si32(a);
+        }
+        return 0;
+//        return
+//            comp_select((_imm & 0b1111) == 0, (_mm_cvtsi128_si32(a) & 0xFF), // 3 cycles ...
+//            comp_select((_imm & 0b1111) < 8,
+//                _mm_extract_epi16(
+//                    _mm_shuffle_epi8(a, _mm_set_epi8(0x80, 7, 0x80, 6, 0x80, 5, 0x80, 4, 0x80, 3, 0x80, 2, 0x80, 1, 0x80, 0)),
+//                    _imm
+//                 ),
+//            comp_select((_imm & 0b1111) < 16,
+//                _mm_extract_epi16(
+//                    _mm_shuffle_epi8(a, _mm_set_epi8(0x80, 15, 0x80, 14, 0x80, 13, 0x80, 12, 0x80, 11, 0x80, 10, 0x80, 9,  0x80, 8)),
+//                    _imm - 8
+//                ),
+//            (void)0
+//        )));
+    }
+#else
+    // _mm_cvtsi128_si32:   (2, 0.5)
+    // _mm_extract_epi16    (3, 0.5)
+    // _mm_unpack*_epi8:    (1, 0.5)
+    // _mm_setzero_si128:   (1, 0.33)
+    // (about 5 cycles)
+    vect_128_intrs_signt(sint_bit_t(8)) _mm_extract_epi8(__m128i a, int _imm)  {
+        return (_imm & 0b1111)
+                ? (_mm_cvtsi128_si32(_mm_srli_si128(a, _imm & 0b1111)) & 0xFF) // 4 cycles ...
+                : (_mm_cvtsi128_si32(a) & 0xFF); // 3 cycles ...
+//            comp_select(_imm == 0, (_mm_cvtsi128_si32(a) & 0xFF) // 3 cycles ...
+//            (_mm_cvtsi128_si32(_mm_srli_si128(a, _imm & 0b1111)) & 0xFF)
+//            // ^^^^^ _mm_cvtsi128_si32: 2 + _mm_srli_si128: 1 + (and r32, r32): 1 == (4 cycles)
+//        );
+            //comp_select(_imm < 8,   _mm_extract_epi16(_mm_unpacklo_epi8(a, _mm_setzero_si128()), _imm), // 5 cycles ...
+            //comp_select(_imm < 16,  _mm_extract_epi16(_mm_unpackhi_epi8(a, _mm_setzero_si128()), _imm - 8), // 5 cycles ..
+    }
+#endif // __SSSE3__ extract_epi8
+
+#endif
+
+vect_128_intrs_signt(uint_bit_t(64)) _mm_extract_epu64(__m128i a, int _imm) {return (uint_bit_t(64))_mm_extract_epi64(a, _imm);}
+vect_128_intrs_signt(uint_bit_t(32)) _mm_extract_epu32(__m128i a, int _imm) {return (uint_bit_t(32))_mm_extract_epi32(a, _imm);}
+vect_128_intrs_signt(uint_bit_t(16)) _mm_extract_epu16(__m128i a, int _imm) {return (uint_bit_t(16))_mm_extract_epi16(a, _imm);}
+vect_128_intrs_signt(uint_bit_t(8))  _mm_extract_epu8(__m128i a, int _imm) {return (uint_bit_t(8))_mm_extract_epi8(a, _imm);}
+
+
+// etract member from vectors using an compile time index literal
+#define vect_128_extrt_imm_flt64bit     _mm_extract_pd
+#define vect_128_extrt_imm_flt32bit     _mm_extract_ps
+#define vect_128_extrt_imm_sint64bit    _mm_extract_epi64
+#define vect_128_extrt_imm_sint32bit    _mm_extract_epi32
+
+// _mm_extract_epi16 returns an int which can play havoc during bit operations ...
+vect_128_intrs_signt(sint_bit_t(16)) vect_128_extrt_imm_sint16bit(__m128i a, int _imm) {
+    return (sint_bit_t(16))_mm_extract_epi16(a, _imm);
+}
+
+#define vect_128_extrt_imm_sint8bit     _mm_extract_epi8
+#define vect_128_extrt_imm_uint64bit    _mm_extract_epu64
+#define vect_128_extrt_imm_uint32bit    _mm_extract_epu32
+#define vect_128_extrt_imm_uint16bit    _mm_extract_epu16
+#define vect_128_extrt_imm_uint8bit     _mm_extract_epu8
+#define vect_128_extrt_imm(va, imm)     vect_128_apply_oper(extrt_imm, vect_memb_t(va), vect_native(va), imm)
+
+
 /*****  UNARY vector operators  ****************************************************************************/
 // broadcast expr into a vector type duplicating as many times as required ...
 #define vect_128_broad_cast_flt64bit_f     _mm_set1_pd
@@ -465,12 +589,22 @@ vect_128_intrs_signt(__m128i) _mm_mullo_epi32(__m128i a, __m128i b) {
 */
 //  requires SSS3 ....
 
-vect_128_intrs_signt(__m128i) _mm_mullo_epi8_ssse3(__m128i __a, __m128i __b) {
+
+#ifdef __SSE4_1__
+vect_128_intrs_signt(__m128i) _mm_mullo_epi8_sse4_1(__m128i a, __m128i b) { // 13 cycles ...
+    return _mm_packs_epi16(
+        _mm_mullo_epi16(_mm_cvtepi8_epi16(a), _mm_cvtepi8_epi16(b)), // [0] - [7]
+        _mm_mullo_epi16(_mm_cvtepi8_epi16(_mm_srli_si128(a, 8)), _mm_cvtepi8_epi16(_mm_srli_si128(b, 8))) // [8 - 15]
+    );
+}
+#endif
+
+vect_128_intrs_signt(__m128i) _mm_mullo_epi8_ssse3(__m128i a, __m128i b) {
     return _mm_or_si128(
       _mm_shuffle_epi8(
           _mm_mullo_epi16(
-              _mm_unpackhi_epi8(__a, _mm_setzero_si128()),
-              _mm_unpackhi_epi8(__b, _mm_setzero_si128())
+              _mm_unpackhi_epi8(a, _mm_setzero_si128()),
+              _mm_unpackhi_epi8(b, _mm_setzero_si128())
           ),
           _mm_set_epi8(
               14,   12,   10,   8,    6,    4,    2,    0,
@@ -479,14 +613,15 @@ vect_128_intrs_signt(__m128i) _mm_mullo_epi8_ssse3(__m128i __a, __m128i __b) {
       ),
       _mm_shuffle_epi8(
           _mm_mullo_epi16(
-              vect_128_cvt_uint8bit_to_uint16bit(__a),
-              vect_128_cvt_uint8bit_to_uint16bit(__b)
+              vect_128_cvt_uint8bit_to_uint16bit(a),
+              vect_128_cvt_uint8bit_to_uint16bit(b)
          ),
          _mm_set_epi8(
               0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
               14,   12,   10,   8,    6,    4,    2,    0
          )
-    ) );
+     )
+  );
 }
 
 /*
@@ -519,9 +654,14 @@ vect_128_intrs_signt(__m128i) _mm_mullo_epi8_sse2(__m128i __a, __m128i __b) {
     );
 }
 
-// mul_ssse3_sint8bit seems slightly slower ...
 #ifndef _mm_mullo_epi8
-#define _mm_mullo_epi8 _mm_mullo_epi8_sse2
+#ifdef __SSE4_1__
+    #define _mm_mullo_epi8  _mm_mullo_epi8_sse4_1
+#elif defined(__SSSE3__)
+    #define _mm_mullo_epi8  _mm_mullo_epi8_ssse3
+#else
+    #define _mm_mullo_epi8 _mm_mullo_epi8_sse2
+#endif
 #endif
 
 
@@ -533,11 +673,507 @@ vect_128_intrs_signt(__m128i) _mm_mullo_epi8_sse2(__m128i __a, __m128i __b) {
 #define vect_128_mul_intgl16bit_f       _mm_mullo_epi16
 #define vect_128_mul_intgl8bit_f        _mm_mullo_epi8
 
+/************************************************************************************************/
+
+#ifndef __SSE4_1__
+    // convert signed low 16 bit into signed 32 bit
+    #ifdef __SSSE3__
+    // 2 - 3 cycles ...
+    #define _mm_cvtepi16_epi32(_a)  \
+        _mm_srai_epi32(             \
+            _mm_shuffle_epi8(_a, _mm_set_epi8(7, 6, 0x80, 0x80, 5, 4, 0x80, 0x80, 3, 2, 0x80, 0x80, 1, 0, 0x80, 0x80)),\
+            16                      \
+        )  // cvt initial set of 16 to 32
+    #else
+    #define _mm_cvtepi16_epi32(_a)      \
+        _mm_srai_epi32(                 \
+            _mm_shufflehi_epi16(        \
+                _mm_shufflelo_epi16(_a, _MM_SHUFFLE(1, 0x80, 0, 0x80)), \
+                _MM_SHUFFLE(1, 0x80, 0, 0x80) \
+            ), 16)
+
+    #endif
+
+    #ifdef __SSSE3__
+    #define _mm_cvtepi8_epi32(_a)   \
+        _mm_srai_epi32(             \
+            _mm_shuffle_epi8(_a, _mm_set_epi8(3, 0x80, 0x80, 0x80, 2, 0x80, 0x80, 0x80, 1, 0x80, 0x80, 0x80, 0, 0x80, 0x80, 0x80)),\
+            24                      \
+        ) // 2 - 3 cycles ...
+
+    #define _mm_cvtepu8_epi32(a)    \
+        _mm_shuffle_epi8(           \
+            a,                      \
+            _mm_set_epi8(0x80, 0x80, 0x80, 3, 0x80, 0x80, 0x80, 2, 0x80, 0x80, 0x80, 1, 0x80, 0x80, 0x80, 0)\
+        ) // 1-2 cycles ...
+    #else
+        // 3 cycles ...
+    vect_128_intrs_signt(__m128i) _mm_cvtepi8_epi32(__m128i a) {
+        a = _mm_unpacklo_epi8(a, a); // a0, a0, a1, a1, a2, a2, a3, a3, ....
+        return _mm_srli_epi32(_mm_unpacklo_epi16(a, a), 24);
+    }
+
+    vect_128_intrs_signt(__m128i) _mm_cvtepi8_epi32(__m128i a) { // 3 cycles ...
+        a = _mm_unpacklo_epi8(a, a); // a0, a0, a1, a1, a2, a2, a3, a3, ....
+//        a = _mm_unpacklo_epi16(a, a); // a0, a0, a0, a0, a1, a1, a1, a1, a2, a2, a2, a2, a3, a3, a3, a3.
+        return _mm_srai_epi32(_mm_unpacklo_epi16(a, a), 24);
+    }
+
+    #endif
+#endif
+
+#ifndef __SSE4_1__
+static inline int _mm_extract_epi32(__m128i, int);
+#endif
 
 // div two vectors
-#define vect_128_div_flt64div   _mm_div_pd
-#define vect_128_div_flt32div   _mm_div_ps
+// method 1) unpack each 32 bit number divide and repack ...
+//      unpacking the components would take 4 cycles for those at index 0,
+//      18 cycles for the rest (22 cycles just to unpack all 8)
+//      div r32                  22/11      14/5       17/1 (http://akuvian.org/src/mubench_results.txt)
+//      each division would take on avg 18 cycles (72 cycles to divide all 4 components)
+//      repacking each component is 2 cycles for a total of 16 cycles ...
+//      total: (22 + 72 + 16) == ~110 cycles ....
+vect_128_intrs_signt(__m128i) _mm_unpack_div_epi32(__m128i a, __m128i b) {
+    return _mm_set_epi32(
+        _mm_extract_epi32(a, 3)/_mm_extract_epi32(b, 3),
+        _mm_extract_epi32(a, 2)/_mm_extract_epi32(b, 2),
+        _mm_extract_epi32(a, 1)/_mm_extract_epi32(b, 1),
+        _mm_extract_epi32(a, 0)/_mm_extract_epi32(b, 0)
+    );
+}
+
+
+//  method 2) convert to floats, divide floats, convert back to int using truncation instead of rounding
+//      _mm_cvttps_epi32: 1x(3, 1) // convert using truncation...
+//      _mm_div_ps: 1x(14, 1)  ....
+//      _mm_cvtps_epi32: 2x(3, 1)
+//      23 cycles ...
+// the main problem with this method is that floats may not be able to represent all possible 32 bit ints
+//      being that single precision only have 24 bits
+// other methods, such as using the multiplicative inverse mod 2**32 are tedious and only applicable if the operand is odd.
+vect_128_intrs_signt(__m128i) _mm_div_epi32(__m128i a, __m128i b) {
+    return _mm_cvttps_epi32(_mm_div_ps(_mm_cvtepi32_ps(a), _mm_cvtepi32_ps(b))); // method 2) ~23 cycles
+}
+
+
+// method 1)
+//    unpack all 16 shorts 3*16 = 48 cycles
+//      dividing each 16 bit would take on avg 22 cycles ... (8*22) = 176
+//    repacking each component is 2 cycles 2*16 = 32
+//      (48 + 176 + 32) = ~256 cycles total ...
+vect_128_intrs_signt(__m128i) _mm_unpack_div_epi16(__m128i a, __m128i b) {
+    return _mm_set_epi16(
+        (short)_mm_extract_epi16(a, 7)/(short)_mm_extract_epi16(b, 7),
+        (short)_mm_extract_epi16(a, 6)/(short)_mm_extract_epi16(b, 6),
+        (short)_mm_extract_epi16(a, 5)/(short)_mm_extract_epi16(b, 5),
+        (short)_mm_extract_epi16(a, 4)/(short)_mm_extract_epi16(b, 4),
+        (short)_mm_extract_epi16(a, 3)/(short)_mm_extract_epi16(b, 3),
+        (short)_mm_extract_epi16(a, 2)/(short)_mm_extract_epi16(b, 2),
+        (short)_mm_extract_epi16(a, 1)/(short)_mm_extract_epi16(b, 1),
+        (short)_mm_extract_epi16(a, 0)/(short)_mm_extract_epi16(b, 0)
+    );
+}
+
+// method 2)
+//      convert to floats divide convert back to shorts ...
+//      _mm_cvtepi16_epi32  4x(1, 0.5) // if SSE4.1 else 4x(2, 1)
+//      _mm_cvtepi32_ps     4x(3, 1)
+//      _mm_div_ps          2x(14, 14)
+//      _mm_cvttps_epi32    2x(3, 1)
+//      _mm_srli_si128      2x(1, 0.5)
+//      _mm_shuffle_epi8    2x(1, 0.5)  // #pshufb  LCPI0_0(%rip), %xmm0 w/ -O(x > 0)
+//      _mm_or_si128        1x(1, 0.33)
+//          4 + 12 + 28 + 6 + 2 + 2 + 1 = w/ SSE 4.1 55 cycles, (+ 4 + 1 == 5) => 60 cycles ...
+// note that _mm_set_epi8 with -O0 produces very BAD CODE over 20 cycles!!
+vect_128_intrs_signt(__m128i) _mm_div_epi16(__m128i a, __m128i b) {
+// divide the first 4 16 bit ints
+#define _div_initial_epi16(a, b) \
+    _mm_div_ps(_mm_cvtepi32_ps(_mm_cvtepi16_epi32(a)), _mm_cvtepi32_ps(_mm_cvtepi16_epi32(b)))
+    return _mm_set_epi64(
+        _mm_cvtps_pi16(_div_initial_epi16(_mm_srli_si128(a, 4), _mm_srli_si128(b, 4))),
+        _mm_cvtps_pi16(_div_initial_epi16(a, b))
+    );
+
+
+//#ifdef __SSSE3__
+//#define _div_epi16_32_byte_indices 13, 12, 9, 8, 5, 4, 1, 0
+//    return _mm_or_si128(
+//        _mm_shuffle_epi8(
+//            _div_initial_epi16(a, b),
+//            _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, _div_epi16_32_byte_indices)
+//        ),
+//        _mm_shuffle_epi8(
+//            _div_initial_epi16(_mm_srli_si128(a, 4), _mm_srli_si128(b, 4)),
+//            _mm_set_epi8(_div_epi16_32_byte_indices, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80)
+//        )
+//    );
+
+//    __m128i
+//        low_res = _div_initial_epi16(a, b),
+//        high_res = _div_initial_epi16(_mm_srli_si128(a, 4), _mm_srli_si128(b, 4));
+
+//    return _mm_or_si128(
+//        _mm_and_si128(_div_initial_epi16(a, b), _mm_set1_epi32(0xFFFF)),
+//    )
+//#endif
+}
+
+//float u8tofloat_trick2(uint8_t x)
+//{
+//    union { float f; uint32_t i; } u; u.f = 32768.0f; u.i |= x;
+//    return (u.f - 32768.0f) * (256.0f / 255.0f);
+//}
+
+vect_128_intrs_signt(__m128) cvt_epi8_ps_0_1(__m128i x) { // 10-11 cycles ...
+    __m128i mov_bytes = _mm_slli_epi32(x, 24);
+    __m128i sign_mask = _mm_srai_epi32(mov_bytes, 32); // create sign mask ...
+    // mag = (x < 0) ? ~x + 1 : x ==> (x ^ (x >>> 8)) + ((x >>> 8) & 1) ==> x ^ 0 + 0 = x, or ((x ^ -1) == ~x) + (-1 & 1 == 1)
+    __m128i mag = _mm_add_epi32(_mm_xor_si128(x, sign_mask), _mm_and_si128(sign_mask, _mm_set1_epi32(1)));
+
+    return _mm_or_ps( // 1 cycle
+        _mm_mul_ps( // 5 cycle
+            _mm_sub_ps( // 1 cycle
+                (__m128)_mm_or_si128( // 1 cycle
+                    _mm_and_si128(mag, _mm_set1_epi32(0xFFU)), // 1 cycle
+                    _mm_set1_epi32(0b01000111000000000000000000000000)
+                ),
+                _mm_set1_ps(32768.0f)
+            ),
+            _mm_set1_ps(256.0f / 255.0f)
+        ),
+        (__m128)_mm_and_si128(mov_bytes, _mm_set1_epi32(1 << 31)) // 2 cycle
+    );
+}
+
+
+#ifndef __SSSE3__
+vect_128_intrs_signt(__m128i) _mm_abs_epi8(__m128i a) { // 5 cycles ...
+    return _mm_add_epi8(
+        _mm_xor_si128(_mm_cmplt_epi8(a, _mm_setzero_si128()), a),
+        _mm_and_si128(_mm_cmplt_epi8(a, _mm_setzero_si128()), _mm_set1_epi8(1))
+    );
+}
+#endif
+
+#ifndef __SSE4_1__
+vect_128_intrs_signt(sint_bit_t(8)) _mm_extract_epi8(__m128i a, int _imm);
+#endif
+// method 1)
+//  unpack all 32 components (total: 64 cycles), divide each (total: 176 cycles), repack vector (total: 64 cycles) ~304 cycles
+vect_128_intrs_signt(__m128i) _mm_unpack_div_epi8(__m128i a, __m128i b) {
+#define _div_char_vect_comp(a, b, index) ((char)_mm_extract_epi8(a, index)/(char)_mm_extract_epi8(b, index))
+    return _mm_set_epi8( // 29.561s, , icc 29.154s
+        _div_char_vect_comp(a, b, 15),
+        _div_char_vect_comp(a, b, 14),
+        _div_char_vect_comp(a, b, 13),
+        _div_char_vect_comp(a, b, 12),
+        _div_char_vect_comp(a, b, 11),
+        _div_char_vect_comp(a, b, 10),
+        _div_char_vect_comp(a, b, 9),
+        _div_char_vect_comp(a, b, 8),
+        _div_char_vect_comp(a, b, 7),
+        _div_char_vect_comp(a, b, 6),
+        _div_char_vect_comp(a, b, 5),
+        _div_char_vect_comp(a, b, 4),
+        _div_char_vect_comp(a, b, 3),
+        _div_char_vect_comp(a, b, 2),
+        _div_char_vect_comp(a, b, 1),
+        _div_char_vect_comp(a, b, 0)
+    );
+}
+
+#ifndef __SSSE3__
+// negate a if b is negative, zero out if b is zero, do nothing if b is positive non-zero
+// 6-8 cycles ...
+vect_128_intrs_signt(__m128i) _mm_sign_epi8(__m128i a, __m128i b) {
+    return _mm_andnot_si128(
+        _mm_cmpeq_epi8(b, _mm_setzero_si128()),
+        _mm_add_epi8(_mm_xor_si128(a, _mm_cmplt_epi8(b, _mm_setzero_si128())), _mm_srli_epi8(b, 7))
+    );
+}
+#endif
+// method 2)
+//  convert to floats divide convert back ...
+
+// _mm_cvtepi8_epi32: 8x(1, 0.5) w/ SSE4.1 otherwise (2, 1)
+// _mm_cvtepi32_ps:   8x(3, 1)
+// _mm_div_ps:        4x(14, 14)
+// _mm_rcp_ps:        (5, 1) or (3, 2)
+// _mm_cvttps_epi32:  4x(3, 1)
+// _mm_srli_si128:    6x(1, 0.5)
+// _mm_shuffle_epi8:  4x(1, 1)
+// _mm_set_epi8:      4x(2, 1)
+// _mm_or_si128:      3x(1, 0.33)
+//      8 + 24 + 56 + 12 + 6 + 4 + 8 + 3 ~121 cycles ...
+vect_128_intrs_signt(__m128i) _mm_div_epi8(__m128i a, __m128i b) {
+#define _mm_div_low_4_bytes(a, b)                           \
+        _mm_cvttps_epi32(_mm_mul_ps(                            \
+            _mm_cvtepi32_ps(_mm_cvtepu8_epi32(a)),              \
+            _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepu8_epi32(b)))   \
+        )) // 21 cycles ...
+
+//    $ icc a.c -Ofast -msse4.1   -Wfatal-errors  && ./a.out total time 14.6392s
+    register __m128i
+        abs_a = _mm_abs_epi8(a), // 1
+        abs_b = _mm_abs_epi8(b), // 1
+        res = // 20.863, //icc a.c -Ofast -msse4.1   -Wfatal-errors  && ./a.out total time 14.6702s
+        _mm_packs_epi16(
+            _mm_packs_epi32(
+                _mm_div_low_4_bytes(abs_a, abs_b),
+                _mm_div_low_4_bytes(_mm_srli_si128(abs_a, 4), _mm_srli_si128(abs_b, 4))
+            ),
+            _mm_packs_epi32(
+                _mm_div_low_4_bytes(_mm_srli_si128(abs_a, 8), _mm_srli_si128(abs_b, 8)),
+                _mm_div_low_4_bytes(_mm_srli_si128(abs_a, 12), _mm_srli_si128(abs_b, 12))
+            )
+        ); // 84 + 9 = 93 cycles ...
+
+#ifdef __SSSE3__
+    return _mm_sign_epi8(_mm_sign_epi8( //  14.2664s
+        _mm_add_epi8( // (corrections due to recp approx, 17 cycles ...) add 1 if the remainder (a*q) equals b
+             _mm_and_si128(
+                 _mm_cmpeq_epi8(_mm_sub_epi8(abs_a, _mm_mullo_epi8(abs_b, res)), abs_b),
+                 _mm_set1_epi8(1)
+             ),
+             res
+         ),
+        b), a); // calculate sign, 2 cycles ...
+#else
+    // calculate sign of quotient // 3-4 cycles
+    __m128i sign = _mm_xor_si128(_mm_cmplt_epi8(a, _mm_setzero_si128()), _mm_cmplt_epi8(b, _mm_setzero_si128()));
+    // apply sign using twos complement to those results, 3 cycles ..
+    return _mm_add_epi8( // 14.5480s
+        _mm_xor_si128(
+            sign,
+            _mm_add_epi8( // add 1 if the remainder (a*q) equals b
+                _mm_and_si128(
+                    _mm_cmpeq_epi8(_mm_sub_epi8(abs_a, _mm_mullo_epi8(abs_b, res)), abs_b),
+                    _mm_set1_epi8(1)
+                ),
+                res
+            )
+        ),
+        _mm_and_si128(sign, _mm_set1_epi8(1))
+    );
+#endif
+
+//    // corrections ... (17 cycles)
+//    res = _mm_add_epi8( // add 1 if the remainder (a*q) equals b
+//        _mm_sign_epi8( // converts -1 to 1 or 0 to 0
+//            _mm_cmpeq_epi8(_mm_sub_epi8(abs_a, _mm_mullo_epi8(abs_b, res)), abs_b), // sets -1 or 0
+//            _mm_cmpeq_epi8(_mm_sub_epi8(abs_a, _mm_mullo_epi8(abs_b, res)), abs_b)
+//        ),
+//        res
+//    );
+
+
+//    // $ icc a.c -Ofast -msse4.1   -Wfatal-errors  && ./a.out total time 14.6409s
+//    __m128i res = _mm_unpacklo_epi64(
+//        _mm_unpacklo_epi32( // 46
+//            _mm_shuffle_epi8( // 22
+//                _mm_cvttps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(abs_a)), _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(abs_b))))), // 21 cycles ..
+//                _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0)),
+//            _mm_shuffle_epi8( // 24
+//                _mm_cvttps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(_mm_srli_si128(abs_a, 4))), _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(_mm_srli_si128(abs_b, 4)))))), // 23 cycles ...
+//                _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0))
+//        ),
+//        _mm_unpacklo_epi32( // 48
+//            _mm_shuffle_epi8( // 24
+//                _mm_cvttps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(_mm_srli_si128(abs_a, 8))), _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(_mm_srli_si128(abs_b, 8)))))), // 23 cycles ...
+//                _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0)),
+//            _mm_shuffle_epi8( // 24
+//                _mm_cvttps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(_mm_srli_si128(abs_a, 12))), _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(_mm_srli_si128(abs_b, 12)))))), // 23 cycles ...
+//                _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0))
+//        )
+//    ); // 95 cycles ...
+
+
+////>>> all([((int((a * 1/ctypes.c_float(b/256.0).value)) >> 8 == a/b) for a in xrange(1, 128) for b in xrange(1, 128)])
+////True
+////>>> all(float32_bin(float(2**16) + float(i/128.0))[-8:] == '{0:08b}'.format(i) for i in xrange(1, 128))
+////True
+//#define _conv_byte_to_0_1_float_trick(a, offset) _mm_sub_ps(_mm_or_ps(     \
+//    _mm_set1_ps((float)(1 << offset)), (__m128)_mm_cvtepu8_epi32(a)             \
+//),  _mm_set1_ps((float)(1 << offset))) // convert 0 < a < 256 to a/256.0 takes: 3 cycles assuming SSE4.1: _mm_cvtepi8_epi32
+//__m128i // 21.852, // icc a.c -Ofast -msse4.1   -Wfatal-errors  && ./a.out total time 14.9120s
+//res =
+//_mm_shuffle_epi8( // 90 cycles ...
+//    _mm_blendv_epi8( // 89 cycles ...
+//        _mm_blend_epi16( // 43 cycles ...
+//            //0@[0] 1@4 2@8 3@12, with zeros everyhwere else ... 21 cycles ...
+//            _mm_cvttps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(_mm_cvtepu8_epi32(abs_a)), _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepu8_epi32(abs_b)))))
+//            ,
+//            // 8@[2] 9@[6] 10@[10] 11@[14], 21 cycles ...
+//           _mm_cvttps_epi32(
+//               _mm_mul_ps(
+//                   _mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128(abs_a, 8))),
+//                   _mm_rcp_ps(_conv_byte_to_0_1_float_trick(_mm_srli_si128(abs_b, 8), 7)) // equivalent to div by 256 << 8 == 65536
+//           )),
+//            0b10101010
+//        ), // 0@0, 1@4, 2@8 3@12,    ----      8@2, 9@6, 10@10, 11@14
+
+
+//        _mm_blend_epi16( // 44 cycles ...
+//            // 4@[1] 5@[5] 6@[9] 7@[13], 21 cycles ...
+//            _mm_cvttps_epi32(
+//                _mm_mul_ps(
+//                    _mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128(abs_a, 4))),
+//                    _mm_rcp_ps(_conv_byte_to_0_1_float_trick(_mm_srli_si128(abs_b, 4), 15)) // equivalent to div by 256
+//            )),
+//            // 12@[3] 13@[7] 14@[11] 15@[15], 22 cycles ...
+//            _mm_slli_epi32(_mm_cvttps_epi32(
+//                _mm_mul_ps(
+//                    _mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128(abs_a, 12))),
+//                    _mm_rcp_ps(_conv_byte_to_0_1_float_trick(_mm_srli_si128(abs_b, 12), 7)) // equivalent to div by 256
+//            )), 8),
+//            0b10101010
+//        ), // 4@1, 5@3, 6@9 7@13,    ----      12@3, 13@7, 14@11, 15@15
+
+//        _mm_set_epi8(0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0)
+//    ),
+//    _mm_set_epi8(
+//        15, 11, 7, 3,
+//        14, 10, 6, 2,
+//        13,  9, 5, 1,
+//        12,  8, 4, 0
+//    ));
+
+
+//    __m128i //20.797s // icc a.c -Ofast -msse4.1   -Wfatal-errors  && ./a.out  total time  14.9553s
+//        res = _mm_or_si128(
+//            _mm_or_si128(
+//                // 21 cycles ..
+//                _mm_cvttps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(_mm_and_si128(abs_a, _mm_set1_epi32(0xFF))), _mm_rcp_ps(_mm_cvtepi32_ps(_mm_and_si128(abs_b, _mm_set1_epi32(0xFF)))))),
+//                _mm_slli_epi32( // 24 cycles ..
+//                    _mm_cvttps_epi32(
+//                        _mm_mul_ps(
+//                            _mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(abs_a, 8), _mm_set1_epi32(0xFF))),
+//                            _mm_rcp_ps(_mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(abs_b, 8), _mm_set1_epi32(0xFF))))
+//                        )
+//                    ),
+//                    8
+//                )
+//            ),
+//            _mm_or_si128(
+//                _mm_slli_epi32( // 24 cycles ...
+//                    _mm_cvttps_epi32(
+//                        _mm_mul_ps(
+//                            _mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(abs_a, 16), _mm_set1_epi32(0xFF))),
+//                            _mm_rcp_ps(_mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(abs_b, 16), _mm_set1_epi32(0xFF))))
+//                        )
+//                    ),
+//                    16
+//                ),
+//                _mm_slli_epi32( // 22 cycles ...
+//                    _mm_cvttps_epi32(
+//                        _mm_mul_ps(
+//                            _mm_cvtepi32_ps(_mm_srli_epi32(abs_a, 24)),
+//                            _mm_rcp_ps(_mm_cvtepi32_ps(_mm_srli_epi32(abs_b, 24)))
+//                        )
+//                    ),
+//                    24
+//                )
+//            )
+//        ); // 94 cycles ...
+
+
+// OTHER SLOWER IMPLEMENTATIONS ....
+//#define _div_low_sign_8bits(a, b) _mm_cvttps_epi32(_mm_div_ps(_mm_cvtepi32_ps(_mm_cvtepi8_epi32(a)), _mm_cvtepi32_ps(_mm_cvtepi8_epi32(b))))
+
+// IMPLEMENTATION 1) 18.955  reqs SSSE3 for the shuffle icc a.c -Ofast -msse4.1   -Wfatal-errors  && ./a.out total time 17.0903s
+//    return _mm_shuffle_epi8(
+//        _mm_or_si128(
+//            _mm_or_si128(
+//                _mm_srli_epi32(_mm_slli_epi32(_div_low_sign_8bits(a, b), 24), 24),
+//                _mm_srli_epi32(_mm_slli_epi32(_div_low_sign_8bits(_mm_srli_si128(a, 4), _mm_srli_si128(b, 4)), 24), 16)
+//            ),
+//            _mm_or_si128(
+//                _mm_srli_epi32(_mm_slli_epi32(_div_low_sign_8bits(_mm_srli_si128(a, 8), _mm_srli_si128(b, 8)), 24), 8),
+//                _mm_slli_epi32(_div_low_sign_8bits(_mm_srli_si128(a, 12), _mm_srli_si128(b, 12)), 24)
+//            )
+//        ),
+//        _mm_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0)
+//    );
+
+
+// IMPLEMENTATION 2) 19.766 contains a BUG!!!!!
+//    return _mm_unpacklo_epi64(
+//        _mm_unpacklo_epi32(
+//            _mm_shuffle_epi8(_mm_cvttps_epi32(_mm_div_ps(_mm_cvtpi8_ps(_mm_movepi64_pi64(a)),   _mm_cvtpi8_ps(_mm_movepi64_pi64(b)))), _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80,  0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0)),
+//            _mm_shuffle_epi8(_mm_cvttps_epi32(_mm_div_ps(_mm_cvtpi8_ps(_mm_movepi64_pi64(_mm_movehdup_ps(a))),   _mm_cvtpi8_ps(_mm_movepi64_pi64(_mm_movehdup_ps(b))))), _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80,  0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0))
+//        ),
+//        _mm_unpacklo_epi32(
+//            _mm_shuffle_epi8(_mm_cvttps_epi32(_mm_div_ps(_mm_cvtpi8_ps(_mm_movepi64_pi64(_mm_srli_si128(a, 8))),  _mm_cvtpi8_ps(_mm_movepi64_pi64(_mm_srli_si128(b, 8))))), _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80,  0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0)),
+//            _mm_shuffle_epi8(_mm_cvttps_epi32(_mm_div_ps(_mm_cvtpi8_ps(_mm_movepi64_pi64(_mm_srli_si128(a, 12))), _mm_cvtpi8_ps(_mm_movepi64_pi64(_mm_srli_si128(b, 12))))), _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80,  0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0))
+//        )
+//    );
+
+
+
+//// IMPLEMENTATION 3) 19.482 (only requires SSE2, while others require SSSE3)
+//// icc a.c -Ofast -msse4.1   -Wfatal-errors  && ./a.out  total time 17.2461s
+//    __m128i r0 = _mm_cvttps_epi32(_mm_div_ps( // a[0]/b[0], a[4]/b[4], a[8]/b[8], a[12]/b[12]
+//        _mm_cvtepi32_ps(_mm_srai_epi32(_mm_slli_epi32(a, 24), 24)),
+//        _mm_cvtepi32_ps(_mm_srai_epi32(_mm_slli_epi32(b, 24), 24))
+//    ));
+
+//    __m128i r1 = _mm_cvttps_epi32(_mm_div_ps( // a[1]/b[1], a[5]/b[5], a[9]/b[9], a[13]/b[13]
+//        _mm_cvtepi32_ps(_mm_srai_epi32(_mm_slli_epi32(a, 16), 24)),
+//        _mm_cvtepi32_ps(_mm_srai_epi32(_mm_slli_epi32(b, 16), 24))
+//    ));
+
+//    __m128i r2 = _mm_cvttps_epi32(_mm_div_ps( // a[2]/b[2], a[6]/b[6], a[10]/b[10], a[14]/b[14]
+//        _mm_cvtepi32_ps(_mm_srai_epi32(_mm_slli_epi32(a, 8), 24)),
+//        _mm_cvtepi32_ps(_mm_srai_epi32(_mm_slli_epi32(b, 8), 24))
+//    ));
+
+//    __m128i r3 = _mm_cvttps_epi32(_mm_div_ps( // a[3]/b[3], a[7]/b[7], a[11]/b[11], a[15]/b[15]
+//        _mm_cvtepi32_ps(_mm_srai_epi32(a, 24)),_mm_cvtepi32_ps(_mm_srai_epi32(b, 24))
+//    ));
+
+//    __m128i // 11 cycles ...
+//        _r0 = _mm_unpacklo_epi8(r0, r2),
+//        _r1 = _mm_unpacklo_epi8(r1, r3),
+//        _r2 = _mm_unpackhi_epi8(r0, r2),
+//        _r3 = _mm_unpackhi_epi8(r1, r3);
+
+//    return _mm_unpacklo_epi64(
+//        _mm_unpacklo_epi32(_mm_unpacklo_epi8(_r0, _r1), _mm_unpackhi_epi8(_r0, _r1)),
+//        _mm_unpacklo_epi32(_mm_unpacklo_epi8(_r2, _r3), _mm_unpackhi_epi8(_r2, _r3))
+//    );
+/****************************************************************************************************/
+
+// IMPLEMENTATION 4) 19.013 reqs SSSE3 for the shuffle ...
+//    icc a.c -Ofast -msse4.1   -Wfatal-errors  && ./a.out total time 16.9727s
+//    return _mm_or_si128(
+//        _mm_or_si128(
+//            _mm_shuffle_epi8(
+//                 _div_low_sign_8bits(a, b),
+//                 _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0)
+//             ),
+//            _mm_shuffle_epi8(
+//                _div_low_sign_8bits(_mm_srli_si128(a, 4), _mm_srli_si128(b, 4)),
+//                _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0, 0x80, 0x80, 0x80, 0x80)
+//            )
+//        ),
+//        _mm_or_si128(
+//            _mm_shuffle_epi8(
+//                _div_low_sign_8bits(_mm_srli_si128(a, 8), _mm_srli_si128(b, 8)),
+//                _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 12, 8, 4, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80)
+//            ),
+//            _mm_shuffle_epi8(
+//                _div_low_sign_8bits(_mm_srli_si128(a, 12), _mm_srli_si128(b, 12)),
+//                _mm_set_epi8(12, 8, 4, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80)
+//            )
+//        )
+//    );
+}
+
+#define vect_128_div_flt64bit   _mm_div_pd // 20 cycles ...
+#define vect_128_div_flt32bit   _mm_div_ps // 14 cycles ...
 // @@TODO: Implmenet integral division (test whether multithreaded code may be faster) ...
+#define vect_128_div_sint32bit _mm_div_epi32
 
 
 #define get_vect_128_apply_func(oblvs...)     vect_128_apply ## oblvs ## _oper
@@ -595,7 +1231,7 @@ vect_128_intrs_signt(__m128i) _mm_mullo_epi8_sse2(__m128i __a, __m128i __b) {
 vect_128_intrs_signt(__m128i) _mm_slli_epi8(__m128i a, int _mag_imm) {
     return _mm_and_si128(
         _mm_slli_epi16(a, _mag_imm),
-        _mm_set1_epi8((unsigned char)(0xFF << ((_mag_imm) & 0b111)))
+        _mm_set1_epi8((unsigned char)(0xFF << ((_mag_imm) & 0b1111)))
     );
 }
 #define _mm_slli_epi8 _mm_slli_epi8
@@ -737,19 +1373,19 @@ vect_128_intrs_signt(__m128i) _mm_sra_epi64(__m128i a, __m128i  b) {
 #define vect_128_rshift_arith_scalr_intgl16bit  _mm_sra_epi16
 #define vect_128_rshift_arith_scalr_intgl8bit   _mm_sra_epi8
 
-#define vect_128_apply_bin_shift_oper(shift_oper, a, b) ({  \
-    typedef typeof(a) _expr_a_sh_bin_t;                     \
-    typedef vect_128_t(_expr_a_sh_bin_t, (_expr_a_sh_bin_t){0}) _t_binr_sdh_t;             \
-    vect_128_intgl_native_t _shftbrd_a                                  \
-        = (vect_128_intgl_native_t)vect_128_broad_cast_to_native_if_scalr(a);   \
-    (_t_binr_sdh_t)(typeof(vect_native((_t_binr_sdh_t){0})))scalr_switch_on_byte_size(       \
+#define vect_128_apply_bin_shift_oper(shift_oper, a, b) ({                              \
+    typedef typeof(a) _expr_a_sh_bin_t;                                                 \
+    typedef vect_128_t(_expr_a_sh_bin_t, (_expr_a_sh_bin_t){0}) _t_binr_sdh_t;          \
+    vect_128_intgl_native_t _shftbrd_a                                                  \
+        = (vect_128_intgl_native_t)vect_128_broad_cast_to_native_if_scalr(a);           \
+    (_t_binr_sdh_t)(typeof(vect_native((_t_binr_sdh_t){0})))scalr_switch_on_byte_size(  \
         vect_memb_t((_t_binr_sdh_t){0}),        \
         vect_128_ ## shift_oper ## _intgl64bit, \
         vect_128_ ## shift_oper ## _intgl32bit, \
         vect_128_ ## shift_oper ## _intgl16bit, \
         vect_128_ ## shift_oper ## _intgl8bit,  \
         vect_128_unable_to_determine_type       \
-    )(_shftbrd_a, b); })
+    )(_shftbrd_a, b);                                    })
 
 #define vect_128_apply_bin_shift_scalr(shift_oper, a, b)    \
     vect_128_apply_bin_shift_oper(shift_oper ## _scalr, a, vect_128_broad_cast_to_native_if_scalr((long)b))
@@ -782,7 +1418,7 @@ vect_128_intrs_signt(__m128i) _mm_sra_epi64(__m128i a, __m128i  b) {
 #endif
 
 
-/* Extends the sign bit result in either all zeros or all ones depending on most significant bit ...... */
+/* Extends the sign bit, results in either all zeros or all ones depending on most significant bit ...... */
 vect_128_intrs_signt(__m128i) vect_128_sign_ext_intgl64bit_f(__m128i a) {return _mm_srai_epi32(_mm_shuffle_epi32(a, _MM_SHUFFLE(3, 3, 1, 1)), 32); } // copy the high 32 bits and right shift (2 cycles) ...
 vect_128_intrs_signt(__m128i) vect_128_sign_ext_intgl32bit_f(__m128i a) {return _mm_srai_epi32(a, 32); }
 
@@ -796,111 +1432,36 @@ vect_128_intrs_signt(__m128)  vect_128_sign_ext_flt32bit_f(__m128 a)  {return _m
 #define vect_128_sign_ext(a) vect_128_unr_broad_cast_scalrs(sign_ext, a, _apply_oblvs_sign_oper)
 
 
-
 // Extract components by immediate index ...
+// SSE* doesn't support extraction of doubles...
+// 1 - 2 cycles ...
+vect_128_intrs_signt(flt_bit_t(64)) _mm_extract_pd(__m128d a, int _imm) {
+    return _mm_cvtsd_f64((_imm & 1) ? (__m128d)_mm_srli_si128((__m128i)a, 8) : a);
+}
+
+
+// extract member from vectors using a scalar (non-immediate) ...
+
+
+#define vect_128_extrt_scalr_flt64bit
+#define vect_128_extrt_scalr_flt32bit
+#define vect_128_extrt_scalr_sint64bit
+#define vect_128_extrt_scalr_sint32bit
+#define vect_128_extrt_scalr_sint16bit
+#define vect_128_extrt_scalr_sint8bit
+#define vect_128_extrt_scalr_uint64bit
+#define vect_128_extrt_scalr_uint32bit
+#define vect_128_extrt_scalr_uint16bit
+#define vect_128_extrt_scalr_uint8bit
+
+
 
 #ifndef __SSE4_1__
-    #define _mm_extract_epi64(a, _imm)  ({                                                  \
-        const vect_128_intgl_native_t _extrt_64bit_va                                       \
-            = vect_128_cast_to_intgl_native(a);                                             \
-        comp_select((_imm) == 0, _mm_cvtsi128_si64(_extrt_64bit_va),                        \
-        comp_select((_imm) == 1, _mm_cvtsi128_si64(_mm_srli_si128(_extrt_64bit_va, 8)),     \
-            _mm_cvtsi128_si64(_mm_srli_si128(_extrt_64bit_va, ((_imm & 0b1) << 3))))); })
-
-    #define _mm_extract_epi32(a, _imm) ({                                                   \
-        const vect_128_intgl_native_t _extrt_32bit_va                                       \
-            = vect_128_cast_to_intgl_native(a);                                             \
-        comp_select((_imm) == 0, _mm_cvtsi128_si32(a),                                      \
-        comp_select((_imm) == 1, _mm_cvtsi128_si32(_mm_srli_si128(_extrt_32bit_va, 4)),     \
-        comp_select((_imm) == 2, _mm_cvtsi128_si32(_mm_srli_si128(_extrt_32bit_va, 8)),     \
-        comp_select((_imm) == 4, _mm_cvtsi128_si32(_mm_srli_si128(_extrt_32bit_va, 12)),    \
-            _mm_cvtsi128_si32(_mm_srli_si128(_extrt_32bit_va, ((_imm) & 0b11) << 2)))))); })
-
-    #define _mm_extract_ps(a, _imm) \
-        _interp(_mm_extract_epi32(vect_128_cast_to_intgl_native(a), _imm), sint_bit_t(32), flt_bit_t(32))
-
-    // _mm_extract_epi16 1x(3, 1)
-    // shuffle 1x(1, 0.5)
-    // about 2 cycles ...
-    #define _mm_extract_epi8_ssse3(_va, _imm_)  ({              \
-        const vect_128_intgl_native_t _va_extr_8bit_sse3        \
-            = vect_128_cast_to_intgl_native(_va);               \
-        comp_select(                                            \
-            (_imm_) < 8,                                        \
-            _mm_extract_epi16(                                  \
-                _mm_shuffle_epi8(                               \
-                    _va_extr_8bit_sse3,                         \
-                    _mm_set_epi8(                               \
-                        0x80, 7, 0x80, 6, 0x80, 5, 0x80, 4,     \
-                        0x80, 3, 0x80, 2, 0x80, 1, 0x80, 0      \
-                    )                                           \
-                ),                                              \
-                _imm_                                           \
-             ),                                                 \
-        comp_select(                                            \
-            (_imm_) < 16,                                       \
-            _mm_extract_epi16(                                  \
-                _mm_shuffle_epi8(                               \
-                    _va_extr_8bit_sse3,                         \
-                    _mm_set_epi8(                               \
-                        0x80, 15, 0x80, 14, 0x80, 13, 0x80, 12, \
-                        0x80, 11, 0x80, 10, 0x80, 9, 0x80, 8    \
-                    )                                           \
-               ),                                               \
-               (_imm_) - 8                                      \
-            ),                                                  \
-        _mm_cvtsi128_si32(_mm_srli_si128(_va_extr_8bit_sse3, (_imm_) & 15)) & 0xFF)); })
-
-    // _mm_extract_epi16 1x(1, 0.5)
-    // _mm_unpack*_epi8: 1x(1, 0.5)
-    // _mm_setzero_si128: 1x(1, 0.33)  (about 3 cycles)
-    #define _mm_extract_epi8_sse2(va, _imm)  ({                     \
-        const vect_128_intgl_native_t _va_extrt_8bit_sse2           \
-            vect_128_cast_to_intgl_native(va);                      \
-        comp_select(                                                \
-            (_imm) < 8,                                             \
-            _mm_extract_epi16(                                      \
-                _mm_unpacklo_epi8(                                  \
-                    _va_extrt_8bit_sse2,                            \
-                    _mm_setzero_si128()                             \
-                ),                                                  \
-                _imm                                                \
-             ),                                                     \
-        comp_select(                                                \
-            (_imm) < 16,                                            \
-            _mm_extract_epi16(                                      \
-                _mm_unpackhi_epi8(                                  \
-                    _va_extrt_8bit_sse2,                            \
-                    _mm_setzero_si128()                             \
-                ),                                                  \
-                (_imm) - 8                                          \
-            ),                                                      \
-        _mm_cvtsi128_si32(                                          \
-            _mm_srli_si128(_va_extrt_8bit_sse2, (_imm) & 15)        \
-        ) & 0xFF )); })
-
-    #ifdef __SSSE3__
-        #define _mm_extract_epi8 _mm_extract_epi8_ssse3
-    #else
-        #define _mm_extract_epi8 _mm_extract_epi8_sse2
-    #endif
+vect_128_intrs_signt(int) _mm_test_all_ones(__m128i a) {
+    return (_mm_cvtsi128_si64(a) & _mm_cvtsi128_si64(_mm_srli_si128(a, 8))) == (long)-1;
+}
 #endif
 
-
-// etract member from vectors ...
-#define vect_128_extrt_imm_flt64bit(va_, _imm)      _interp(vect_128_extrt_imm_sint64bit(va_, _imm), sint_bit_t(64), flt_bit_t(64))
-#define vect_128_extrt_imm_flt32bit(va_, _imm)      _mm_extract_ps(va_, _imm)
-#define vect_128_extrt_imm_sint64bit(va_, _imm)     _mm_extract_epi64(vect_128_cast_to_intgl_native(va_), _imm)
-#define vect_128_extrt_imm_sint32bit(va_, _imm)     _mm_extract_epi32(vect_128_cast_to_intgl_native(va_), _imm)
-#define vect_128_extrt_imm_sint16bit(va_, _imm)     ((sint_bit_t(16))_mm_extract_epi16(vect_128_cast_to_intgl_native(va_), _imm))
-#define vect_128_extrt_imm_sint8bit(va_, _imm)      ((sint_bit_t(8))_mm_extract_epi8(vect_128_cast_to_intgl_native(va_), _imm))
-#define vect_128_extrt_imm_uint64bit(va_, _imm)     ((uint_bit_t(64))vect_128_extrt_imm_sint64bit(va_, _imm))
-#define vect_128_extrt_imm_uint32bit(va_, _imm)     ((uint_bit_t(32))vect_128_extrt_imm_sint32bit(va_, _imm))
-#define vect_128_extrt_imm_uint16bit(va_, _imm)     ((uint_bit_t(16))vect_128_extrt_imm_sint16bit(va_, _imm))
-#define vect_128_extrt_imm_uint8bit(va_, _imm)      ((uint_bit_t(8))vect_128_extrt_imm_sint8bit(va_, _imm))
-#define _vect_128_extrt_imm_(_memb_kind) _vect_128_native_oper(extrt_imm, _memb_kind)
-
-#define vect_128_extrt_imm(va, imm) vect_128_apply_oper(extrt_imm, vect_memb_t(va), vect_native(va), imm)
 
 
 #endif // __SSE2__
