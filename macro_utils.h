@@ -108,7 +108,7 @@
 #define macro_comma_delim_8(arg)    macro_comma_delim_4(arg), macro_comma_delim_4(arg)
 #define macro_comma_delim_16(arg)   macro_comma_delim_8(arg), macro_comma_delim_8(arg)
 
-#define macro_comma_delim(_imm_literal, arg)  macro_comma_delim ## _imm_literal (arg)
+#define macro_comma_delim(_imm_literal, arg)  macro_comma_delim_ ## _imm_literal (arg)
 
 
 #define macro_arg_0(arg_0, args...) arg_0

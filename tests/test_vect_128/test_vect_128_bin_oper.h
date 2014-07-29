@@ -138,6 +138,30 @@
 #define _test_vect_128_sub_bin(_memb_type)  _test_vect_128_oper(sub, _memb_type, bin_opers)
 #define _test_vect_128_mul_bin(_memb_type)  _test_vect_128_oper(mul, _memb_type, bin_opers)
 
+#define _test_vect_128_div(_memb_type) ({                 \
+    int i, num_index, denom_index;                             \
+    _memb_type num = 0, denom;                              \
+    vect_128_t(_memb_type) _va, _vb, quot;                            \
+    for (num_index = 0; num_index < (1LLU << bit_size(_memb_type)); num_index += vect_memb_cnt(_va)){  \
+        _va = vect_128_set(macro_comma_delim_16(num++)); \
+        denom = 1;                                                                      \
+        for (denom_index = 1; denom_index < (1LLU << bit_size(_memb_type)); denom_index += vect_memb_cnt(_va)) {           \
+            _vb = vect_128_set(macro_comma_delim_16(denom++));      \
+            for (i = 0; i < vect_memb_cnt(_vb); i++) if (vect_memb(_vb, i) == 0) vect_memb(_vb, i) = 1;\
+            quot = vect_128_div(_va, _vb);                              \
+         for (i = 0; i < vect_memb_cnt(_va); i++)                                         \
+            if ((_memb_type)(vect_memb(_va, i)/vect_memb(_vb, i)) != vect_memb(quot, i))      \
+                error_with_format(                      \
+                    "failed to divide type(s): %s\n"        \
+                    "%s/%s == %s != %s\n"                 \
+                , #_memb_type                           \
+                , scalr_str(local_temp_str, vect_memb(_va, i))\
+                , scalr_str(local_temp_str, vect_memb(_vb, i))\
+                , scalr_str(local_temp_str, (_memb_type)(vect_memb(_va, i)/vect_memb(_vb, i)))\
+                , scalr_str(local_temp_str, vect_memb(quot, i))            \
+            );   \
+    }}})
+
 #define to_binary(buffer, expr) ({\
     typeof(expr) e = (expr);  \
     char *dest = (buffer);\
