@@ -28,7 +28,7 @@ $(foreach arc,$(arg_cnt_kinds),$(shft)_$(mg_t)_$(arc))))
 
 load_test_opers=load_unr load_align_unr load_unr_vect_128_p load_align_unr_vect_128_p
 store_test_opers=store store_align
-test_bin_opers=extrt_imm set $(load_test_opers) $(store_test_opers) xor_bin and_bin or_bin add_bin sub_bin mul_bin $(shift_test_opers), div
+test_bin_opers=extrt_imm set $(load_test_opers) $(store_test_opers) xor_bin and_bin or_bin add_bin sub_bin mul_bin $(shift_test_opers)
 
 v=@
 

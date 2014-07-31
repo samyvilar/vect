@@ -5,6 +5,7 @@
 #include "comp_utils.h"
 #include "scalr_types.h"
 
+
 #define vect_comp_err_emit   comp_error_init
 
 #define vect_512_not_supprtd(...) ({vect_comp_err_emit("Theres no support for 512 bit vectors (yet) ..."); })
