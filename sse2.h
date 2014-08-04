@@ -7,8 +7,8 @@
 
 #define _mm_setbits_pd(a) _mm_cmpeq_pd(a, a)
 
-
 #define _mm_setbits_si128(a) _mm_cmpeq_epi32(a, a)  // 1 cycle ...
+
 
 vect_128_intrs_signt(__m128i) _mm_invert_si128(__m128i a) {
     return _mm_xor_si128(a, _mm_setbits_si128(a)); // returns ~a, 2 cycles ...
@@ -18,6 +18,10 @@ vect_128_intrs_signt(__m128i) _mm_cmpge_epi32(__m128i a, __m128i b) { // 3 cycle
     return _mm_invert_si128(_mm_cmplt_epi32(a, b)); // a >= b == ~(a < b)
 }
 
+
+vect_128_intrs_signt(int) _mm_test_all_ones_sse2(__m128i a) {
+    return _mm_cvtsi128_si64(_mm_and_si128(a, _mm_srli_si128(a, 8))) == -1LL;
+}
 
 // mul two vectors
 /*

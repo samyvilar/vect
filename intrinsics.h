@@ -15,6 +15,7 @@
 
 
 #include "sse41.h"
+#include "ssse3.h"
 #include "sse2.h"
 
 

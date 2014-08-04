@@ -204,8 +204,12 @@ extern void vect_128_unable_to_determine_type(unable_to_detemine_type_t _, ...);
 /************************************************************************************/
 
 
-vect_128_intrs_signt(__m128d) vect_128_to_native_flt64bit(vect_128_flt64bit_t __a)   {return vect_native(__a);}
-vect_128_intrs_signt(__m128)  vect_128_to_native_flt32bit(vect_128_flt32bit_t __a)   {return vect_native(__a);}
+vect_128_intrs_signt(__m128d) vect_128_to_native_flt64bit(vect_128_flt64bit_t a) {
+    return vect_native(a);
+}
+vect_128_intrs_signt(__m128)  vect_128_to_native_flt32bit(vect_128_flt32bit_t a) {
+    return vect_native(a);
+}
 
 #define vect_128_to_native_intgl_tmpl(memb_name) \
     vect_128_intrs_signt(__m128i) vect_128_to_native_ ## memb_name(vect_128_ ## memb_name ## _t __a) {return vect_native(__a);}
@@ -306,10 +310,18 @@ vect_128_to_native_intgl_tmpl(uint8bit)
         vect_128_unable_to_determine_type ); })
 
 
-vect_128_intrs_signt(uint_bit_t(64)) _mm_extract_epu64(__m128i a, int _imm) {return (uint_bit_t(64))_mm_extract_epi64(a, _imm);}
-vect_128_intrs_signt(uint_bit_t(32)) _mm_extract_epu32(__m128i a, int _imm) {return (uint_bit_t(32))_mm_extract_epi32(a, _imm);}
-vect_128_intrs_signt(uint_bit_t(16)) _mm_extract_epu16(__m128i a, int _imm) {return (uint_bit_t(16))_mm_extract_epi16(a, _imm);}
-vect_128_intrs_signt(uint_bit_t(8))  _mm_extract_epu8(__m128i a, int _imm) {return (uint_bit_t(8))_mm_extract_epi8(a, _imm);}
+vect_128_intrs_signt(uint_bit_t(64)) _mm_extract_epu64(__m128i a, int _imm) {
+    return (uint_bit_t(64))_mm_extract_epi64(a, _imm);
+}
+vect_128_intrs_signt(uint_bit_t(32)) _mm_extract_epu32(__m128i a, int _imm) {
+    return (uint_bit_t(32))_mm_extract_epi32(a, _imm);
+}
+vect_128_intrs_signt(uint_bit_t(16)) _mm_extract_epu16(__m128i a, int _imm) {
+    return (uint_bit_t(16))_mm_extract_epi16(a, _imm);
+}
+vect_128_intrs_signt(uint_bit_t(8))  _mm_extract_epu8(__m128i a, int _imm) {
+    return (uint_bit_t(8))_mm_extract_epi8(a, _imm);
+}
 
 
 // etract member from vectors using an compile time index literal
@@ -317,12 +329,10 @@ vect_128_intrs_signt(uint_bit_t(8))  _mm_extract_epu8(__m128i a, int _imm) {retu
 #define vect_128_extrt_imm_flt32bit     _mm_extract_ps
 #define vect_128_extrt_imm_sint64bit    _mm_extract_epi64
 #define vect_128_extrt_imm_sint32bit    _mm_extract_epi32
-
 // _mm_extract_epi16 returns an int which can play havoc during bit operations ...
 vect_128_intrs_signt(sint_bit_t(16)) vect_128_extrt_imm_sint16bit(__m128i a, int _imm) {
     return (sint_bit_t(16))_mm_extract_epi16(a, _imm);
 }
-
 #define vect_128_extrt_imm_sint8bit     _mm_extract_epi8
 #define vect_128_extrt_imm_uint64bit    _mm_extract_epu64
 #define vect_128_extrt_imm_uint32bit    _mm_extract_epu32
@@ -476,7 +486,6 @@ vect_128_intrs_signt(__m128i) _mm_div_epi16(__m128i a, __m128i b) {
 }
 
 vect_128_intrs_signt(__m128i) _mm_div_epu16(__m128i a, __m128i b) {
-
 #ifdef __SSE4_1__
     return _mm_packus_epi32( // 54 cycles ...
         _mm_cvttps_epi32(_mm_div_ps(_mm_cvtepi32_ps(_mm_cvtepu16_epi32(a)), _mm_cvtepi32_ps(_mm_cvtepu16_epi32(b)))),
@@ -608,8 +617,8 @@ vect_128_intrs_signt(__m128i) _mm_div_epu8(__m128i a, __m128i b) {
 }
 
 
-#define vect_128_div_flt64bit   _mm_div_pd // 20 cycles ...
-#define vect_128_div_flt32bit   _mm_div_ps // 14 cycles ...
+#define vect_128_div_flt64bit  _mm_div_pd // 20 cycles ...
+#define vect_128_div_flt32bit  _mm_div_ps // 14 cycles ...
 
 #define vect_128_div_sint64bit _mm_div_epi64
 #define vect_128_div_sint32bit _mm_div_epi32
@@ -643,9 +652,9 @@ vect_128_intrs_signt(__m128i) _mm_div_epu8(__m128i a, __m128i b) {
     typedef vect_128_t(oper_a, (typeof(oper_a)){0}) _bin_ad_da1_t;              \
     (_bin_ad_da1_t)(typeof(vect_native((_bin_ad_da1_t){})))(get_vect_128_apply_func(oblvs)(\
         oper,                                                                   \
-        vect_memb_t((_bin_ad_da1_t){0}),                                             \
-        vect_128_broad_cast_to_native_if_scalr(oper_a),          \
-        vect_128_broad_cast_to_native_if_scalr(oper_b))); })
+        vect_memb_t((_bin_ad_da1_t){0}),                                        \
+        vect_128_broad_cast_to_native_if_scalr(oper_a),                         \
+        vect_128_broad_cast_to_native_if_scalr(oper_b)));})
 
 
 #define _apply_oblvs_scalr_oper _oblvs_scalr
@@ -666,7 +675,6 @@ vect_128_intrs_signt(__m128i) _mm_div_epu8(__m128i a, __m128i b) {
 #define vect_128_add(a, b)    vect_128_bin_broad_cast_scalrs(add, a, b, _apply_oblvs_sign_oper)
 #define vect_128_sub(a, b)    vect_128_bin_broad_cast_scalrs(sub, a, b, _apply_oblvs_sign_oper)
 #define vect_128_mul(a, b)    vect_128_bin_broad_cast_scalrs(mul, a, b, _apply_oblvs_sign_oper)
-
 #define vect_128_div(a, b)    vect_128_bin_broad_cast_scalrs(div, a, b)
 
 
@@ -678,17 +686,8 @@ vect_128_intrs_signt(__m128i) _mm_div_epu8(__m128i a, __m128i b) {
 // reqs:
 //  _mm_and_si128: 1x(1, 0.33)
 //  _mm_slli_epi16: 1x(1, 1)
-// _mm_set1_epi16: ~ 1x(1, 0) (so about 2-3 cycles)
-vect_128_intrs_signt(__m128i) _mm_slli_epi8(__m128i a, int _mag_imm) {
-    // 0b1*(8 -_mag_imm)  0*_mag_imm
-//     return _mm_and_si128(
-//        _mm_packs_epi16(
-//            _mm_slli_epi16(_mm_cmpeq_epi8(a, a), _mag_imm),
-//            _mm_slli_epi16(_mm_cmpeq_epi8(a, a), _mag_imm)
-//        ),
-//        _mm_slli_epi16(a, _mag_imm)
-//    );
-
+// _mm_set1_epi8: ~ 1x(1, 0) (so about 2-3 cycles)
+vect_128_intrs_signt(__m128i) _mm_slli_epi8(__m128i a, int _mag_imm) {    
      return _mm_and_si128(
         _mm_slli_epi16(a, _mag_imm),
         _mm_set1_epi8((unsigned char)(0xFF << ((_mag_imm) & 0b1111)))
@@ -698,7 +697,7 @@ vect_128_intrs_signt(__m128i) _mm_slli_epi8(__m128i a, int _mag_imm) {
 #endif
 
 #ifndef _mm_sll_epi8
-// (3-4 cycles)
+// (4-6 cycles)
 vect_128_intrs_signt(__m128i) _mm_sll_epi8(__m128i a, __m128i b) {    
     return _mm_and_si128(_mm_sll_epi16(a, b), _mm_set1_epi8(0xFF << _mm_cvtsi128_si64(b)));
 }
@@ -718,9 +717,10 @@ vect_128_intrs_signt(__m128i) _mm_srli_epi8(__m128i a, int b) {
 #define _mm_srli_epi8 _mm_srli_epi8
 #endif
 
+
 #ifndef _mm_srl_epi8
-// (3-4) cycles ...
-vect_128_intrs_signt(__m128i) _mm_srl_epi8(__m128i a, __m128i b) {
+// (5-7) cycles ...
+vect_128_intrs_signt(__m128i) _mm_srl_epi8(__m128i a, __m128i b) {    
     return _mm_and_si128(_mm_srl_epi16(a, b), _mm_set1_epi8(0xFFU >> _mm_cvtsi128_si64(b)));
 }
 #define _mm_srl_epi8 _mm_srl_epi8
@@ -728,32 +728,45 @@ vect_128_intrs_signt(__m128i) _mm_srl_epi8(__m128i a, __m128i b) {
 
 
 #ifndef _mm_srai_epi8
-// 6 cycles ..
+// 5 cycles ..
 vect_128_intrs_signt(__m128i) _mm_srai_epi8(__m128i a, int b) {        
-    return _mm_packs_epi16(
-        _mm_srai_epi16(_mm_cvtepi8_epi16(a), b),
-        _mm_srai_epi16(_mm_cvtepi8_epi16(_mm_srli_si128(a, 8)), b)
-    );
+    return
+        _mm_packs_epi16(
+            _mm_srai_epi16(_mm_unpacklo_epi8(a, a), 8 + b),
+            _mm_srai_epi16(_mm_unpackhi_epi8(a, a), 8 + b)
+        );
+
+//#ifdef __SSE4_1__
+//    return _mm_packs_epi16( // 6 cycles ...
+//        _mm_srai_epi16(_mm_cvtepi8_epi16(a), b),
+//        _mm_srai_epi16(_mm_cvtepi8_epi16(_mm_srli_si128(a, 8)), b)
+//    );
+//#else
+//    return _mm_or_si128( // ~7 cycles ...
+//        _mm_srli_epi8(a, b),
+//        _mm_slli_epi8(_mm_cmplt_epi8(a, _mm_setzero_si128()), 8 - b)
+//    );
+//#endif
 }
 #define _mm_srai_epi8 _mm_srai_epi8
 #endif
 
 
 #ifndef _mm_sra_epi8
-// 6-8 cycles ..
-vect_128_intrs_signt(__m128i) _mm_sra_epi8(__m128i a, __m128i b) {
+// 8-10 cycles ..
+vect_128_intrs_signt(__m128i) _mm_sra_epi8(__m128i a, __m128i b) {    
 #ifdef __SSE4_1__
-    return _mm_packs_epi16( // 6 cycles
+    return _mm_packs_epi16( // 8 cycles, 6 instrcts, no mem access ...
         _mm_sra_epi16(_mm_cvtepi8_epi16(a), b),
         _mm_sra_epi16(_mm_cvtepi8_epi16(_mm_srli_si128(a, 8)), b)
     );
 #else
-    return _mm_or_si128( // 8 cyces ...
-        _mm_and_si128(
-            _mm_slli_epi16(_mm_cmpeq_epi16(a, a), 8),
-            _mm_sra_epi16(a, b)
-        ),
-        _mm_srli_epi16(_mm_sra_epi16(_mm_slli_epi16(a, 8), b), 8)
+    // 10 cycles, 8 instrs, no mem access ...
+    b = _mm_sub_epi64(b, _mm_slli_epi64(_mm_cmpeq_epi8(b, b), 3) /*_mm_set1_epi64x(8)*/);
+    // ^^^^^^ b - -8 == b + 8
+    return _mm_packs_epi16(
+        _mm_sra_epi16(_mm_unpacklo_epi8(a, a), b),
+        _mm_sra_epi16(_mm_unpackhi_epi8(a, a), b)
     );
 #endif
 }
@@ -764,22 +777,21 @@ vect_128_intrs_signt(__m128i) _mm_sra_epi8(__m128i a, __m128i b) {
 
 
 #ifndef _mm_srai_epi64
-// theres no right 64 bit arithmetic shift we emualted by first doing a logical left shift or it with 1s
-// we load the duplicate high 32 bits in each half and check if they are less than 0
-// if they are they will be set to -1 if not they will be set to 0, then simply left shift the -1s
+// theres no right 64 bit arithmetic shift, but we can simulated by first doing a logical left shift or it with 1s
+// - load the duplicate high 32 bits in each half and check if they are less than 0
+// if they are they will be set to 1s if not they will be set to 0s, then simply left shift the 1s
 // reqs:
-//      _mm_setzero_si128   1x(1, 0.3),
 //      _mm_shuffle_epi32   1x(1, 0.5),
-//      _mm_cmplt_epi32     1x(1, 0.5),
+//      _mm_srai_epi32      1x(1, -),
 //      _mm_slli_epi64      1x(1, 1),
 //      _mm_srli_epi64      1x(1, 1),
-//      _mm_or_si128        1x(1, 0.33) (about 6 cycles)
-vect_128_intrs_signt(__m128i) _mm_srai_epi64(__m128i a, int _imm) {
+//      _mm_or_si128        1x(1, 0.33) (about 5 cycles)
+vect_128_intrs_signt(__m128i) _mm_srai_epi64(__m128i a, int _imm) {   
     return _mm_or_si128(
         _mm_srli_epi64(a, _imm),
         _mm_slli_epi64(
-            _mm_cmplt_epi32(_mm_shuffle_epi32(a, _MM_SHUFFLE(3, 3, 1, 1)), _mm_setzero_si128()),
-            (64 - (_imm))
+            _mm_srai_epi32(_mm_shuffle_epi32(a, _MM_SHUFFLE(3, 3, 1, 1)), 32), // 2 cycles ...
+            64 - _imm
         )
     );
 }
@@ -787,13 +799,17 @@ vect_128_intrs_signt(__m128i) _mm_srai_epi64(__m128i a, int _imm) {
 #endif
 
 #ifndef _mm_sra_epi64
-// (6 - 8) cycles ...
+// 10-12 cycles ...
 vect_128_intrs_signt(__m128i) _mm_sra_epi64(__m128i a, __m128i  b) {
     return _mm_or_si128(
-        _mm_srl_epi64(a, b),
-        _mm_sll_epi64(
-            _mm_cmplt_epi32(_mm_shuffle_epi32(a, _MM_SHUFFLE(3, 3, 1, 1)), _mm_setzero_si128()),
-            _mm_sub_epi64(_mm_set1_epi64x(64), b)
+        _mm_srl_epi64(a, b), // (ulong)a >> b
+        _mm_sll_epi64( // (a > 0) << 64 - b
+            _mm_srai_epi32(_mm_shuffle_epi32(a, _MM_SHUFFLE(3, 3, 1, 1)), 32),
+            _mm_sub_epi64( // 64 - b
+//                _mm_set1_epi64x(64)
+                _mm_srli_epi64(_mm_slli_epi64(_mm_cmpeq_epi8(b, b), 63), 58), // 3 cycles (but no mem access)
+                b
+            )
         )
     );
 }

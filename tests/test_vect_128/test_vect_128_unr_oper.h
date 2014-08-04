@@ -20,6 +20,5 @@
 
 #define _test_vect_128_sign_ext_unr(_memb_type)  _test_vect_128_unr_oper(sign_ext, _memb_type, (_single_eval(_va, 0)))
 
-//#define _test_vect_128_sign_ext_bin(_memb_type) _test_vect_128_unr_oper(sign_ext, _memb_type, (_single_eval(_va, 0), _vo))
 
 #endif // TEST_VECT_128_UNR_OPER_H
